@@ -1,0 +1,23 @@
+# ขั้นตอนการพัฒนาระบบสร้าง Admin ใหม่ (Implementation Steps)
+
+## Phase 1: Database & Backend Data Structure (ฐานข้อมูลและโครงสร้างข้อมูล)
+- [ ] **อัปเดต Schema ฐานข้อมูล:** เพิ่มฟิลด์ `department` (แผนก) และ `major` (สาขาวิชา) ลงในตาราง `admin_user` ([src/db/schema/admin-users.ts](file:///c:/Pharmacy_Academy/pharmacy_academy-api/src/db/schema/admin-users.ts))
+- [ ] **อัปเดต Schema ของ API:** แก้ไข `createOfficerSchema` ใน [admin-manage.schema.ts](file:///c:/Pharmacy_Academy/pharmacy_academy-api/src/features/admin-auth/admin-manage.schema.ts) เพื่อรองรับฟิลด์ใหม่ (Role, Major, Department) พร้อมทั้งนำ `username` ที่เคยบังคับใส่ออก (เพราะเราจะสร้างให้อัตโนมัติ)
+- [ ] **Migrate Database:** รันคำสั่ง `drizzle-kit push` เพื่อนำโครงสร้างใหม่ไปปรับปรุงในฐานข้อมูลจริง
+
+## Phase 2: Backend Logic & API (ระบบจัดการและ API)
+- [ ] **ปรับปรุง API การสร้างผู้ใช้:** แก้ไข [createOfficer](file:///c:/Pharmacy_Academy/pharmacy_academy-api/src/features/admin-auth/admin-manage.controller.ts#10-76) ใน [admin-manage.controller.ts](file:///c:/Pharmacy_Academy/pharmacy_academy-api/src/features/admin-auth/admin-manage.controller.ts)
+  - [ ] จัดการกรณีเลือกสร้าง **System Admin**: ค้นหาจำนวน System Admin ในแผนกนั้นๆ เพื่อสร้าง Username ในรูปแบบ `[แผนก][ลำดับ]` (เช่น `วิชาการ1`)
+  - [ ] จัดการกรณีเลือกสร้าง **Super Admin**: ดึงชื่อจากส่วนแรกของ Email มาตั้งเป็น Username
+  - [ ] กำหนดบันทึกข้อมูล `department` และ `major` ลงในฐานข้อมูล
+- [ ] **จัดการ Role และ สิทธิ์ (Permissions):** ตรวจสอบให้แน่ใจว่าระบบบันทึก `roleId` ชี้ไปยัง Super Admin หรือ System Admin อย่างถูกต้อง
+
+## Phase 3: Frontend UI & API Integration (หน้าจอแสดงผลและการเชื่อมต่อ)
+- [ ] **สร้างหน้า UI สร้าง Admin ใหม่:** สร้างหน้าเว็บใหม่ที่ `/users/admins/page.tsx`
+  - [ ] สร้างฟอร์มที่มีให้กรอก: Email, สาขาวิชา (Major), แผนก (Department), Password
+  - [ ] สร้าง Dropdown หรือ Radio button ให้เลือกระดับ (Super Admin หรือ System Admin)
+- [ ] **เชื่อมต่อ API:** นำข้อมูลจากฟอร์มส่งไปยัง API `POST /admin/users` และแสดงผลลัพธ์ (สำเร็จ/ผิดพลาด) ให้ผู้ใช้ทราบ
+
+## Phase 4: Permissions Enforcement (การควบคุมสิทธิ์การเข้าถึง)
+- [ ] **ปรับปรุง Sidebar:** ซ่อนเมนูที่ไม่ได้เกี่ยวข้องกับรอบ "คอร์สเรียน" (เช่น ผู้ใช้งาน, การเงิน, จัดการแอดมิน) สำหรับคนที่เป็น **System Admin**
+- [ ] **ตรวจสอบสิทธิ์ในหน้าต่างๆ:** ทำการดักสิทธิ์ (Route Guarding) ไม่ให้ System Admin พิมพ์ URL เพื่อเข้าไปจัดการส่วนอื่นที่ไม่ได้รับอนุญาต

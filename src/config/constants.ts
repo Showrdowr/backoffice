@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
+    baseURL: (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/v1\/?$/, '') + '/v1',
     timeout: 30000,
 } as const;
 

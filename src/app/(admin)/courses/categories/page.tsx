@@ -7,9 +7,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { categoryService } from '@/features/courses/services/categoryService';
 import type { Category } from '@/features/courses/types';
+import { useAuth } from '@/features/auth/auth-context';
 
 export default function CategoriesPage() {
     const router = useRouter();
+    const { isAdmin } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -52,13 +54,15 @@ export default function CategoriesPage() {
                     <h1 className="text-3xl font-bold text-slate-800 mb-1">หมวดหมู่คอร์สเรียน</h1>
                     <p className="text-slate-500">จัดการโครงสร้างคอร์สและการจัดกลุ่มข้อมูล</p>
                 </div>
-                <Link
-                    href="/courses/categories/add"
-                    className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-semibold"
-                >
-                    <Plus size={18} />
-                    เพิ่มหมวดหมู่
-                </Link>
+                {isAdmin && (
+                    <Link
+                        href="/courses/categories/add"
+                        className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-semibold"
+                    >
+                        <Plus size={18} />
+                        เพิ่มหมวดหมู่
+                    </Link>
+                )}
             </div>
 
             <div className="grid grid-cols-1 gap-8">
@@ -132,22 +136,24 @@ export default function CategoriesPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                                                        <button
-                                                            className="p-2 hover:bg-blue-100 rounded-lg transition-all text-slate-400 hover:text-blue-600"
-                                                            title="แก้ไข"
-                                                            onClick={() => router.push(`/courses/categories/${category.id}/edit`)}
-                                                        >
-                                                            <Edit size={16} />
-                                                        </button>
-                                                        <button
-                                                            className="p-2 hover:bg-red-100 rounded-lg transition-all text-slate-400 hover:text-red-600"
-                                                            title="ลบ"
-                                                            onClick={() => handleDeleteCategory(category.id)}
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
+                                                    {isAdmin && (
+                                                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                                            <button
+                                                                className="p-2 hover:bg-blue-100 rounded-lg transition-all text-slate-400 hover:text-blue-600"
+                                                                title="แก้ไข"
+                                                                onClick={() => router.push(`/courses/categories/${category.id}/edit`)}
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button
+                                                                className="p-2 hover:bg-red-100 rounded-lg transition-all text-slate-400 hover:text-red-600"
+                                                                title="ลบ"
+                                                                onClick={() => handleDeleteCategory(category.id)}
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))

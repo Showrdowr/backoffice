@@ -57,8 +57,13 @@ export interface Course {
     subcategoryId?: number;
     title: string;
     description?: string;
+    details?: string;
     authorName?: string;
     price?: number;
+    language?: string;
+    skillLevel?: 'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    hasCertificate?: boolean;
+    enrollmentDeadline?: string | Date;
     // Schema field
     thumbnailUrl?: string;
     // Backward compatible alias
@@ -207,8 +212,13 @@ export interface CreateCourseInput {
     categoryId?: number;
     title: string;
     description?: string;
+    details?: string;
     authorName?: string;
     price?: number;
+    language?: string;
+    skillLevel?: 'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    hasCertificate?: boolean;
+    enrollmentDeadline?: string;
     previewVideoId?: number;
     cpeCredits?: number;
     conferenceCode?: string;

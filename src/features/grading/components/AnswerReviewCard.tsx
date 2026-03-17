@@ -12,8 +12,8 @@ export function AnswerReviewCard({ answer, onGradeChange }: AnswerReviewCardProp
   const [points, setPoints] = useState<number>(answer.pointsEarned || 0);
   const [feedback, setFeedback] = useState<string>(answer.feedback || '');
 
-  const isMultipleChoice = answer.question.questionType === 'MULTIPLE_CHOICE';
-  const isFreeText = answer.question.questionType === 'FREE_TEXT';
+  const isAutoGraded = answer.question.questionType === 'MULTIPLE_CHOICE' || answer.question.questionType === 'TRUE_FALSE';
+  const isFreeText = answer.question.questionType === 'SHORT_ANSWER';
 
   const handlePointsChange = (value: number) => {
     setPoints(value);
@@ -32,7 +32,7 @@ export function AnswerReviewCard({ answer, onGradeChange }: AnswerReviewCardProp
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-2">
-          {isMultipleChoice ? (
+          {isAutoGraded ? (
             <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
               📝 Multiple Choice
             </span>
@@ -59,7 +59,7 @@ export function AnswerReviewCard({ answer, onGradeChange }: AnswerReviewCardProp
       </div>
 
       {/* Multiple Choice Options */}
-      {isMultipleChoice && answer.question.options && (
+      {isAutoGraded && answer.question.options && (
         <div className="mb-4">
           <h5 className="font-semibold text-gray-700 text-sm mb-2">ตัวเลือก:</h5>
           <div className="space-y-2">

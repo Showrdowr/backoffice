@@ -1,7 +1,8 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCourses } from '@/features/courses/hooks';
+import { useCourses, useCategories } from '@/features/courses/hooks';
 import { CourseStatsCards } from '@/features/courses/components/CourseStatsCards';
 import { CourseFilters } from '@/features/courses/components/CourseFilters';
 import { CoursesTable } from '@/features/courses/components/CoursesTable';
@@ -12,6 +13,63 @@ import Link from 'next/link';
 export default function CoursesPage() {
     const router = useRouter();
     const { courses, stats, isLoading, error, deleteCourse } = useCourses();
+    const { categories } = useCategories();
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('ALL');
+    const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('ALL');
+
+    const categoryOptions = useMemo(() => {
+        const fromApi = categories.map((category) => ({
+            id: String(category.id),
+            name: category.name,
+        }));
+
+        if (fromApi.length > 0) return fromApi;
+
+        const unique = new Map<string, { id: string; name: string }>();
+        courses.forEach((course) => {
+            const categoryName = typeof course.category === 'object' ? course.category?.name : course.category;
+            const id = course.categoryId ? String(course.categoryId) : categoryName || 'uncategorized';
+            const name = categoryName || 'Uncategorized';
+            if (!unique.has(id)) {
+                unique.set(id, { id, name });
+            }
+        });
+
+        return Array.from(unique.values());
+    }, [categories, courses]);
+
+    const filteredCourses = useMemo(() => {
+        const keyword = searchQuery.trim().toLowerCase();
+
+        return courses.filter((course) => {
+            const categoryName = typeof course.category === 'object' ? course.category?.name : course.category;
+            const categoryIdFromCourse =
+                course.categoryId ||
+                (typeof course.category === 'object' ? course.category?.id : undefined);
+            const courseStatus = String(course.status || 'DRAFT').toUpperCase();
+
+            const searchableText = [
+                course.title,
+                course.description,
+                course.authorName,
+                categoryName,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            const matchesSearch = !keyword || searchableText.includes(keyword);
+            const matchesCategory =
+                selectedCategory === 'ALL' ||
+                String(categoryIdFromCourse || '') === selectedCategory;
+            const matchesStatus =
+                selectedStatus === 'ALL' || courseStatus === selectedStatus;
+
+            return matchesSearch && matchesCategory && matchesStatus;
+        });
+    }, [courses, searchQuery, selectedCategory, selectedStatus]);
 
     if (isLoading) {
         return <LoadingSpinner message="กำลังโหลดข้อมูลคอร์ส..." />;
@@ -48,9 +106,17 @@ export default function CoursesPage() {
 
             {/* Table Card */}
             <div className="bg-white rounded-2xl shadow-md border border-violet-100 overflow-hidden">
-                <CourseFilters />
+                <CourseFilters
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    categoryValue={selectedCategory}
+                    onCategoryChange={setSelectedCategory}
+                    statusValue={selectedStatus}
+                    onStatusChange={setSelectedStatus}
+                    categories={categoryOptions}
+                />
                 <CoursesTable
-                    courses={courses}
+                    courses={filteredCourses}
                     onView={(id) => router.push(`/courses/${id}`)}
                     onEdit={(id) => router.push(`/courses/${id}/edit`)}
                     onDelete={async (id) => {
@@ -69,16 +135,16 @@ export default function CoursesPage() {
                 {/* Pagination */}
                 <div className="p-6 border-t border-violet-100 bg-slate-50 flex items-center justify-between">
                     <p className="text-sm text-slate-500 font-medium">
-                        แสดง 1-{courses.length} {stats && `จาก ${stats.total} รายการ`}
+                        {filteredCourses.length > 0
+                            ? `แสดง 1-${filteredCourses.length} จาก ${courses.length} รายการ`
+                            : `ไม่พบข้อมูล จาก ${courses.length} รายการ`}
                     </p>
                     <div className="flex items-center gap-2">
                         <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all" disabled>
                             ก่อนหน้า
                         </button>
                         <button className="px-4 py-2 bg-violet-500 text-white rounded-xl text-sm font-semibold shadow-sm">1</button>
-                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white font-semibold transition-all">2</button>
-                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white font-semibold transition-all">3</button>
-                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white font-semibold transition-all">
+                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all" disabled>
                             ถัดไป
                         </button>
                     </div>

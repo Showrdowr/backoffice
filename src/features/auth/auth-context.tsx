@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_CONFIG } from '@/config/constants';
 
 // Types
 export interface AdminUser {
@@ -31,7 +32,7 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE = API_CONFIG.baseURL;
 const TOKEN_KEY = 'backoffice_token';
 const USER_KEY = 'backoffice_user';
 
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, 0);
 
         // Verify token is still valid
-        fetch(`${API_BASE}/v1/admin/auth/me`, {
+        fetch(`${API_BASE}/admin/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         })
           .then((res) => {
@@ -105,14 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string, captchaAnswer?: string, captchaToken?: string) => {
-    const res = await fetch(`${API_BASE}/v1/admin/auth/login`, {
+    const res = await fetch(`${API_BASE}/admin/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, captchaAnswer, captchaToken }),
     });
 
     const data = await res.json();
-    console.log('DEBUG: Auth API response:', { status: res.status, ok: res.ok, data });
 
     if (!res.ok || !data.success) {
       const err = new Error(data.error || data.message || 'เข้าสู่ระบบล้มเหลว');
@@ -120,10 +120,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       Object.assign(err, { 
         field: data.field || null,
         requiresCaptcha: data.requiresCaptcha || false 
-      });
-      console.log('DEBUG: Error object created:', { 
-        message: err.message, 
-        requiresCaptcha: (err as Error & { requiresCaptcha?: boolean }).requiresCaptcha 
       });
       throw err;
     }

@@ -39,7 +39,7 @@ export interface GradingAnswer {
   question: {
     id: number;
     questionText: string;
-    questionType: 'MULTIPLE_CHOICE' | 'FREE_TEXT';
+    questionType: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER';
     scoreWeight: number;
     correctAnswer?: string;
     options?: { id: string; text: string }[];

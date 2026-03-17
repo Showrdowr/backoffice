@@ -45,7 +45,15 @@ class ApiClient {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+                let message = errorData.message || errorData.error || `HTTP error! status: ${response.status}`;
+                if (Array.isArray(errorData.details) && errorData.details.length > 0) {
+                    const first = errorData.details[0];
+                    if (first?.message) {
+                        const path = Array.isArray(first.path) ? first.path.join('.') : '';
+                        message += path ? ` (${path}: ${first.message})` : ` (${first.message})`;
+                    }
+                }
+                throw new Error(message);
             }
 
             const data = await response.json();
@@ -85,11 +93,11 @@ class ApiClient {
     async getPaginated<T>(
         endpoint: string,
         page: number = 1,
-        pageSize: number = 20
+        limit: number = 20
     ): Promise<PaginatedResponse<T>> {
         const params = new URLSearchParams({
             page: page.toString(),
-            pageSize: pageSize.toString(),
+            limit: limit.toString(),
         });
 
         const response = await this.request<PaginatedResponse<T>>(

@@ -14,12 +14,20 @@ interface CourseHeroProps {
 }
 
 export function CourseHero({ course, enrollmentStats, onDelete, onDuplicate }: CourseHeroProps) {
+    const normalizeStatus = (status: string) => String(status || 'DRAFT').toUpperCase();
+
     const getStatusColor = (status: string) => {
-        return status === 'published' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700';
+        const normalizedStatus = normalizeStatus(status);
+        if (normalizedStatus === 'PUBLISHED') return 'bg-green-100 text-green-700';
+        if (normalizedStatus === 'ARCHIVED') return 'bg-slate-200 text-slate-700';
+        return 'bg-orange-100 text-orange-700';
     };
 
     const getStatusText = (status: string) => {
-        return status === 'published' ? 'เผยแพร่แล้ว' : 'ฉบับร่าง';
+        const normalizedStatus = normalizeStatus(status);
+        if (normalizedStatus === 'PUBLISHED') return 'เผยแพร่แล้ว';
+        if (normalizedStatus === 'ARCHIVED') return 'เก็บถาวร';
+        return 'ฉบับร่าง';
     };
 
     return (

@@ -1,35 +1,50 @@
 // CPE Credits Feature Hooks
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { CpeRecord, CpeStats } from './types';
-import { MOCK_CPE_RECORDS, MOCK_CPE_STATS } from './types';
+import { cpeService } from './services/cpeService';
 
 export function useCpeCredits() {
-    const [records, setRecords] = useState<CpeRecord[]>(MOCK_CPE_RECORDS);
-    const [stats, setStats] = useState<CpeStats>(MOCK_CPE_STATS);
-    const [loading, setLoading] = useState(false);
+    const [records, setRecords] = useState<CpeRecord[]>([]);
+    const [stats, setStats] = useState<CpeStats | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchRecords = useCallback(async () => {
+    const fetchRecords = useCallback(async (search?: string) => {
         setLoading(true);
+        setError(null);
         try {
-            // TODO: Implement API call
-            setRecords(MOCK_CPE_RECORDS);
-            setStats(MOCK_CPE_STATS);
+            const [recordsData, statsData] = await Promise.all([
+                cpeService.getRecords({ page: 1, limit: 50, search }),
+                cpeService.getStats(),
+            ]);
+            setRecords(recordsData.records);
+            setStats(statsData);
+        } catch (err) {
+            setError('เกิดข้อผิดพลาดในการโหลดข้อมูล CPE');
+            console.error(err);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    const filteredRecords = records.filter(record =>
-        record.pharmacistName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.courseName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    useEffect(() => {
+        fetchRecords();
+    }, [fetchRecords]);
+
+    const filteredRecords = searchQuery
+        ? records.filter(record =>
+            record.pharmacistName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            record.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            record.courseName.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        : records;
 
     return {
         records: filteredRecords,
         stats,
         loading,
+        error,
         fetchRecords,
         searchQuery,
         setSearchQuery

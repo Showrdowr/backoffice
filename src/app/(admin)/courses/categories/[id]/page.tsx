@@ -43,6 +43,10 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
     const filteredCourses = selectedSubcategory 
         ? courses.filter(c => c.subcategoryId?.toString() === selectedSubcategory.toString())
         : courses;
+    const formatCoursePrice = (price: unknown) => {
+        const parsedPrice = Number(price ?? 0);
+        return parsedPrice <= 0 ? 'ฟรี' : `฿${parsedPrice.toLocaleString()}`;
+    };
 
     if (loading) {
         return <LoadingSpinner message="กำลังโหลด..." fullScreen />;
@@ -145,9 +149,8 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                                 </h3>
                             </div>
                             <div className="flex items-center justify-between text-sm text-slate-500 mb-4 border-t border-slate-50 pt-4">
-                                <div className="flex items-center gap-1 font-bold">
-                                    <span className="text-violet-500">฿</span>
-                                    <span>{(course.price ?? 0).toLocaleString()}</span>
+                                <div className="flex items-center gap-1 font-bold text-violet-500">
+                                    <span>{formatCoursePrice(course.price)}</span>
                                 </div>
                                 <div className="flex items-center gap-1 font-bold">
                                     <span className="text-emerald-500">CPE</span>

@@ -82,8 +82,7 @@ export const userService = {
      */
     async deleteUser(id: string): Promise<void> {
         try {
-            // In production: await apiClient.delete(`/users/${id}`);
-            console.log('Delete user:', id);
+            await apiClient.delete(`/users/${id}`);
         } catch (error) {
             console.error('Failed to delete user:', error);
             throw error;

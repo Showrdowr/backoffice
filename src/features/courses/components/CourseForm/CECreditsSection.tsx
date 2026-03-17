@@ -1,9 +1,13 @@
 interface CECreditsSectionProps {
     ceEnabled: boolean;
     onCeEnabledChange: (enabled: boolean) => void;
+    cpeCredits?: number;
+    onCpeCreditsChange?: (credits: number) => void;
+    conferenceCode?: string;
+    onConferenceCodeChange?: (code: string) => void;
 }
 
-export function CECreditsSection({ ceEnabled, onCeEnabledChange }: CECreditsSectionProps) {
+export function CECreditsSection({ ceEnabled, onCeEnabledChange, cpeCredits = 0, onCpeCreditsChange, conferenceCode = '', onConferenceCodeChange }: CECreditsSectionProps) {
     return (
         <div className="bg-white rounded-2xl shadow-md border border-sky-100">
             <div className="p-6 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-100 rounded-t-2xl">
@@ -31,6 +35,8 @@ export function CECreditsSection({ ceEnabled, onCeEnabledChange }: CECreditsSect
                                 min={0}
                                 max={20}
                                 step={0.5}
+                                value={cpeCredits}
+                                onChange={(e) => onCpeCreditsChange?.(Number(e.target.value) || 0)}
                                 className="w-full px-4 py-3 border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all"
                                 placeholder="0"
                             />
@@ -39,6 +45,8 @@ export function CECreditsSection({ ceEnabled, onCeEnabledChange }: CECreditsSect
                             <label className="block text-sm font-semibold text-slate-700 mb-2">Conference Code</label>
                             <input
                                 type="text"
+                                value={conferenceCode}
+                                onChange={(e) => onConferenceCodeChange?.(e.target.value)}
                                 className="w-full px-4 py-3 border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all"
                                 placeholder="Conference Code"
                             />

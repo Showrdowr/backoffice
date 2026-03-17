@@ -1,14 +1,41 @@
-import { Search, Download, Award, Calendar, FileText, Users } from 'lucide-react';
+'use client';
 
-const ceRecords = [
-    { id: 1, pharmacist: 'ภก.สุรชัย เก่งมาก', license: 'ภ.12345', course: 'การดูแลผู้ป่วยโรคเรื้อรัง', credits: 3, date: '20 ธ.ค. 2024' },
-    { id: 2, pharmacist: 'ภญ.วิภา รักการสอน', license: 'ภ.23456', course: 'เภสัชกรรมคลินิกขั้นสูง', credits: 5, date: '19 ธ.ค. 2024' },
-    { id: 3, pharmacist: 'ภก.ณัฐพล มีความรู้', license: 'ภ.34567', course: 'กฎหมายเภสัชกรรม 2024', credits: 2, date: '18 ธ.ค. 2024' },
-    { id: 4, pharmacist: 'ภญ.ปิยะ ใจดี', license: 'ภ.45678', course: 'ทักษะการสื่อสารกับผู้ป่วย', credits: 2, date: '17 ธ.ค. 2024' },
-    { id: 5, pharmacist: 'ภก.สมชาย รักเรียน', license: 'ภ.56789', course: 'เภสัชกรรมชุมชนยุคใหม่', credits: 4, date: '16 ธ.ค. 2024' },
-];
+import { Search, Download, Award, Calendar, FileText, Users, AlertTriangle } from 'lucide-react';
+import { useCpeCredits } from '@/features/cpe-credits/hooks';
+import { formatDistanceToNow } from 'date-fns';
+import { th } from 'date-fns/locale';
 
 export default function CECreditsPage() {
+    const { records, stats, loading, error, searchQuery, setSearchQuery } = useCpeCredits();
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-slate-500">กำลังโหลดข้อมูล CPE...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
+                    <p className="text-red-500 mb-4">{error}</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    >
+                        ลองอีกครั้ง
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             {/* Page Header */}
@@ -32,7 +59,7 @@ export default function CECreditsPage() {
                         </div>
                         <div>
                             <p className="text-sm text-slate-500">CE ออกเดือนนี้</p>
-                            <p className="text-xl font-bold text-slate-800">1,245</p>
+                            <p className="text-xl font-bold text-slate-800">{stats?.totalCreditsThisMonth?.toLocaleString() ?? '-'}</p>
                         </div>
                     </div>
                 </div>
@@ -43,7 +70,7 @@ export default function CECreditsPage() {
                         </div>
                         <div>
                             <p className="text-sm text-slate-500">เภสัชกรได้รับ CE</p>
-                            <p className="text-xl font-bold text-slate-800">856</p>
+                            <p className="text-xl font-bold text-slate-800">{stats?.pharmacistsReceived?.toLocaleString() ?? '-'}</p>
                         </div>
                     </div>
                 </div>
@@ -54,7 +81,7 @@ export default function CECreditsPage() {
                         </div>
                         <div>
                             <p className="text-sm text-slate-500">คอร์สที่มี CE</p>
-                            <p className="text-xl font-bold text-slate-800">45</p>
+                            <p className="text-xl font-bold text-slate-800">{stats?.coursesWithCpe?.toLocaleString() ?? '-'}</p>
                         </div>
                     </div>
                 </div>
@@ -65,7 +92,7 @@ export default function CECreditsPage() {
                         </div>
                         <div>
                             <p className="text-sm text-slate-500">CE รวมปีนี้</p>
-                            <p className="text-xl font-bold text-slate-800">18,456</p>
+                            <p className="text-xl font-bold text-slate-800">{stats?.totalCreditsThisYear?.toLocaleString() ?? '-'}</p>
                         </div>
                     </div>
                 </div>
@@ -83,10 +110,10 @@ export default function CECreditsPage() {
                             type="text"
                             placeholder="ค้นหาเภสัชกร หรือ เลขใบประกอบวิชาชีพ..."
                             className="bg-transparent border-none outline-none text-sm flex-1"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-                    <input type="date" className="px-4 py-2 border border-slate-200 rounded-lg text-sm" />
-                    <input type="date" className="px-4 py-2 border border-slate-200 rounded-lg text-sm" />
                 </div>
 
                 <div className="overflow-x-auto">
@@ -101,20 +128,32 @@ export default function CECreditsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {ceRecords.map((record) => (
-                                <tr key={record.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-4 font-medium text-slate-800">{record.pharmacist}</td>
-                                    <td className="px-6 py-4 font-mono text-slate-600">{record.license}</td>
-                                    <td className="px-6 py-4 text-slate-600">{record.course}</td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <Award size={16} className="text-amber-500" />
-                                            <span className="font-medium text-slate-800">{record.credits}</span>
-                                        </div>
+                            {records.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                        ไม่พบข้อมูล CPE Credit
                                     </td>
-                                    <td className="px-6 py-4 text-slate-500">{record.date}</td>
                                 </tr>
-                            ))}
+                            ) : (
+                                records.map((record) => (
+                                    <tr key={record.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4 font-medium text-slate-800">{record.pharmacistName}</td>
+                                        <td className="px-6 py-4 font-mono text-slate-600">{record.licenseNumber || '-'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{record.courseName}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <Award size={16} className="text-amber-500" />
+                                                <span className="font-medium text-slate-800">{record.credits}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500">
+                                            {record.completedAt
+                                                ? formatDistanceToNow(new Date(record.completedAt), { addSuffix: true, locale: th })
+                                                : '-'}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

@@ -3,6 +3,7 @@
 import { use, useState, useEffect } from 'react';
 import { Save, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCourseForm } from '@/features/courses/hooks/useCourseForm';
 import { ContentSection } from '@/features/courses/components/CourseForm/ContentSection';
 import { PricingSection } from '@/features/courses/components/CourseForm/PricingSection';
@@ -21,6 +22,7 @@ import type { Category } from '@/features/courses/types/categories';
 
 export default function EditCoursePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState('basic'); // basic, curriculum, assessment, settings
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -32,7 +34,17 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         description, setDescription,
         details, setDetails,
         categoryId, setCategoryId,
-        subcategories, setSubcategories,
+        subcategoryId, setSubcategoryId,
+        price, setPrice,
+        cpeCredits, setCpeCredits,
+        conferenceCode, setConferenceCode,
+        language, setLanguage,
+        skillLevel, setSkillLevel,
+        hasCertificate, setHasCertificate,
+        enrollmentDeadline, setEnrollmentDeadline,
+        authorName, setAuthorName,
+        thumbnailPreview,
+        handleThumbnailSelect,
         saveCourse,
 
         // Videos
@@ -88,15 +100,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
 
     const handleCategoryChange = (catId: string) => {
         setCategoryId(catId);
-        setSubcategories([]); // Reset subcategories when category changes
-    };
-
-    const toggleSubcategory = (subId: string) => {
-        setSubcategories(prev =>
-            prev.includes(subId)
-                ? prev.filter(id => id !== subId)
-                : [...prev, subId]
-        );
+        setSubcategoryId(''); // Reset subcategory when category changes
     };
 
     const [isSaving, setIsSaving] = useState(false);
@@ -106,6 +110,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         try {
             await saveCourse();
             alert('บันทึกข้อมูลเรียบร้อย');
+            router.push('/courses');
+            router.refresh();
         } catch (error) {
             console.error('Failed to save course:', error);
             alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
@@ -225,6 +231,18 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                             className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                            ชื่อผู้สอน
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={authorName}
+                                            onChange={(e) => setAuthorName(e.target.value)}
+                                            className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all"
+                                            placeholder="เช่น ภก.วิชัย ใจดี"
+                                        />
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -245,26 +263,18 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     {/* Subcategories... */}
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                            หมวดหมู่ย่อย <span className="text-slate-400">(เลือกได้หลายรายการ)</span>
+                                            หมวดหมู่ย่อย
                                         </label>
-                                        <div className="border border-sky-200 rounded-xl p-3 max-h-48 overflow-y-auto bg-white">
-                                            <div className="space-y-2">
-                                                {categories.find(c => c.id.toString() === categoryId.toString())?.subcategories?.map((sub) => (
-                                                    <label key={sub.id} className="flex items-center gap-2 cursor-pointer hover:bg-sky-50 p-2 rounded-lg transition-colors">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={subcategories.includes(sub.id.toString())}
-                                                            onChange={() => toggleSubcategory(sub.id.toString())}
-                                                            className="w-4 h-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
-                                                        />
-                                                        <div>
-                                                            <span className="text-sm font-medium text-slate-700">{sub.name}</span>
-                                                            {sub.description && <p className="text-xs text-slate-500">{sub.description}</p>}
-                                                        </div>
-                                                    </label>
-                                                )) || <p className="text-sm text-slate-400 text-center py-4">ไม่มีหมวดหมู่ย่อย</p>}
-                                            </div>
-                                        </div>
+                                        <select
+                                            value={subcategoryId}
+                                            onChange={(e) => setSubcategoryId(e.target.value)}
+                                            className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all bg-white"
+                                        >
+                                            <option value="">ไม่ระบุ</option>
+                                            {categories.find(c => c.id.toString() === categoryId.toString())?.subcategories?.map((sub) => (
+                                                <option key={sub.id} value={sub.id}>{sub.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -276,14 +286,45 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     <h2 className="text-xl font-bold text-slate-800">รูปปกคอร์ส</h2>
                                 </div>
                                 <div className="p-6">
-                                    <div className="border-2 border-dashed border-sky-300 rounded-xl p-8 text-center bg-gradient-to-br from-sky-50 to-blue-50 hover:border-sky-400 transition-all cursor-pointer">
-                                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-sm">
-                                            <ImageIcon size={32} className="text-sky-500" />
+                                    {thumbnailPreview ? (
+                                        <div className="relative">
+                                            <img src={thumbnailPreview} alt="รูปปก" className="w-full rounded-xl object-cover aspect-video" />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const input = document.getElementById('edit-thumbnail-input') as HTMLInputElement;
+                                                    input?.click();
+                                                }}
+                                                className="mt-3 text-sm text-sky-600 hover:text-sky-700 font-semibold"
+                                            >
+                                                เปลี่ยนรูปภาพ
+                                            </button>
                                         </div>
-                                        <p className="text-sm font-semibold text-slate-700 mb-1">อัปโหลดรูปภาพ</p>
-                                        <p className="text-xs text-slate-500">แนะนำ: 1280x720px</p>
-                                    </div>
-                                    <input type="file" className="mt-4 w-full text-sm" accept="image/*" />
+                                    ) : (
+                                        <div
+                                            onClick={() => {
+                                                const input = document.getElementById('edit-thumbnail-input') as HTMLInputElement;
+                                                input?.click();
+                                            }}
+                                            className="border-2 border-dashed border-sky-300 rounded-xl p-8 text-center bg-gradient-to-br from-sky-50 to-blue-50 hover:border-sky-400 transition-all cursor-pointer"
+                                        >
+                                            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-sm">
+                                                <ImageIcon size={32} className="text-sky-500" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-slate-700 mb-1">อัปโหลดรูปภาพ</p>
+                                            <p className="text-xs text-slate-500">แนะนำ: 1280x720px (JPG, PNG)</p>
+                                        </div>
+                                    )}
+                                    <input
+                                        id="edit-thumbnail-input"
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleThumbnailSelect(file);
+                                        }}
+                                    />
                                 </div>
                             </div>
 
@@ -402,8 +443,69 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 {/* 4. Settings Tab */}
                 {activeTab === 'settings' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <PricingSection courseType={courseType} onCourseTypeChange={setCourseType} />
-                        <CECreditsSection ceEnabled={ceEnabled} onCeEnabledChange={setCeEnabled} />
+                        <PricingSection
+                            courseType={courseType}
+                            onCourseTypeChange={setCourseType}
+                            price={price}
+                            onPriceChange={setPrice}
+                        />
+                        <CECreditsSection
+                            ceEnabled={ceEnabled}
+                            onCeEnabledChange={setCeEnabled}
+                            cpeCredits={cpeCredits}
+                            onCpeCreditsChange={setCpeCredits}
+                            conferenceCode={conferenceCode}
+                            onConferenceCodeChange={setConferenceCode}
+                        />
+
+                        <div className="bg-white rounded-2xl shadow-md border border-sky-100">
+                            <div className="p-6 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 rounded-t-2xl">
+                                <h2 className="text-xl font-bold text-slate-800">ข้อมูลเพิ่มเติม</h2>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Language</label>
+                                    <input
+                                        type="text"
+                                        value={language}
+                                        onChange={(e) => setLanguage(e.target.value)}
+                                        placeholder="เช่น Thai, English"
+                                        className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Skill Level</label>
+                                    <select
+                                        value={skillLevel}
+                                        onChange={(e) => setSkillLevel(e.target.value as 'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED')}
+                                        className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all bg-white"
+                                    >
+                                        <option value="ALL">All Level</option>
+                                        <option value="BEGINNER">Beginner</option>
+                                        <option value="INTERMEDIATE">Intermediate</option>
+                                        <option value="ADVANCED">Advanced</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Enrollment Deadline</label>
+                                    <input
+                                        type="date"
+                                        value={enrollmentDeadline}
+                                        onChange={(e) => setEnrollmentDeadline(e.target.value)}
+                                        className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all"
+                                    />
+                                </div>
+                                <label className="flex items-center justify-between p-3 border border-sky-100 rounded-xl bg-slate-50">
+                                    <span className="text-sm font-semibold text-slate-700">Certifications</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={hasCertificate}
+                                        onChange={(e) => setHasCertificate(e.target.checked)}
+                                        className="w-5 h-5 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                </label>
+                            </div>
+                        </div>
 
                         <div className="bg-white rounded-2xl shadow-md border border-sky-100">
                             <div className="p-6 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 rounded-t-2xl">
@@ -412,7 +514,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             <div className="p-6">
                                 <select
                                     value={status}
-                                    onChange={(e) => setStatus(e.target.value as any)}
+                                    onChange={(e) => setStatus(e.target.value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')}
                                     className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all bg-white"
                                 >
                                     <option value="DRAFT">ฉบับร่าง (Draft)</option>

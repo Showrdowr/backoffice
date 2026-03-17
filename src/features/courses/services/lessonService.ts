@@ -4,7 +4,6 @@ import type {
   CreateLessonInput,
   VideoQuestion,
   CreateVideoQuestionInput,
-  QuestionType,
 } from "@/features/courses/types";
 
 export interface LessonsData {
@@ -18,65 +17,13 @@ export const lessonService = {
    */
   async getLessons(courseId: number): Promise<LessonsData> {
     try {
-      // In production: const response = await apiClient.get<LessonsData>(`/courses/${courseId}/lessons`);
-
-      // Mock data
-      return {
-        lessons: [
-          {
-            id: 1,
-            courseId,
-            title: "บทที่ 1: บทนำและแนวคิดพื้นฐาน",
-            sequenceOrder: 1,
-            duration: "30:00",
-            videoId: 1,
-            videoQuestions: [
-              {
-                id: 1,
-                lessonId: 1,
-                questionText:
-                  "จากที่กล่าวมา เภสัชกรควรให้ความสำคัญกับอะไรมากที่สุด?",
-                displayAtSeconds: 900,
-                questionType: "MULTIPLE_CHOICE" as QuestionType,
-              },
-              {
-                id: 2,
-                lessonId: 1,
-                questionText: "ข้อใดไม่ใช่หลักการพื้นฐาน?",
-                displayAtSeconds: 1500,
-                questionType: "MULTIPLE_CHOICE" as QuestionType,
-              },
-            ],
-          },
-          {
-            id: 2,
-            courseId,
-            title: "บทที่ 2: เนื้อหาหลัก",
-            sequenceOrder: 2,
-            duration: "45:00",
-            videoId: 2,
-            videoQuestions: [
-              {
-                id: 3,
-                lessonId: 2,
-                questionText: "อธิบายขั้นตอนการให้คำปรึกษา",
-                displayAtSeconds: 1200,
-                questionType: "FREE_TEXT" as QuestionType,
-              },
-            ],
-          },
-          {
-            id: 3,
-            courseId,
-            title: "บทที่ 3: Case Study",
-            sequenceOrder: 3,
-            duration: "25:00",
-            videoId: 3,
-            videoQuestions: [],
-          },
-        ],
-        totalVideoQuestions: 3,
-      };
+      const response = await apiClient.get<any[]>(`/courses/${courseId}/lessons`);
+      const lessons = response.data || [];
+      const totalVideoQuestions = lessons.reduce(
+        (acc: number, l: any) => acc + (l.videoQuestions?.length || 0),
+        0
+      );
+      return { lessons, totalVideoQuestions };
     } catch (error) {
       console.error("Failed to fetch lessons:", error);
       throw error;
@@ -88,16 +35,12 @@ export const lessonService = {
    */
   async createLesson(data: CreateLessonInput): Promise<Lesson> {
     try {
-      // In production: const response = await apiClient.post<Lesson>(`/courses/${data.courseId}/lessons`, data);
-      console.log("Create lesson:", data);
-      return {
-        id: Date.now(),
-        courseId: data.courseId,
+      const response = await apiClient.post<any>(`/courses/${data.courseId}/lessons`, {
         title: data.title,
-        sequenceOrder: data.sequenceOrder,
-        videoId: data.videoId,
-        videoQuestions: [],
-      };
+        videoId: data.videoId || null,
+        sequenceOrder: data.sequenceOrder || 1,
+      });
+      return response.data;
     } catch (error) {
       console.error("Failed to create lesson:", error);
       throw error;
@@ -112,14 +55,8 @@ export const lessonService = {
     data: Partial<CreateLessonInput>
   ): Promise<Lesson> {
     try {
-      // In production: const response = await apiClient.put<Lesson>(`/lessons/${id}`, data);
-      console.log("Update lesson:", id, data);
-      return {
-        id,
-        title: data.title || "",
-        sequenceOrder: data.sequenceOrder,
-        videoId: data.videoId,
-      };
+      const response = await apiClient.put<any>(`/lessons/${id}`, data);
+      return response.data;
     } catch (error) {
       console.error("Failed to update lesson:", error);
       throw error;
@@ -131,8 +68,7 @@ export const lessonService = {
    */
   async deleteLesson(id: number): Promise<void> {
     try {
-      // In production: await apiClient.delete(`/lessons/${id}`);
-      console.log("Delete lesson:", id);
+      await apiClient.delete(`/lessons/${id}`);
     } catch (error) {
       console.error("Failed to delete lesson:", error);
       throw error;
@@ -146,7 +82,7 @@ export const lessonService = {
     data: CreateVideoQuestionInput
   ): Promise<VideoQuestion> {
     try {
-      // In production: const response = await apiClient.post<VideoQuestion>(`/lessons/${data.lessonId}/questions`, data);
+      // TODO: Connect when video-questions backend API is ready
       console.log("Add video question:", data);
       return {
         id: Date.now(),
@@ -167,7 +103,7 @@ export const lessonService = {
    */
   async deleteVideoQuestion(id: number): Promise<void> {
     try {
-      // In production: await apiClient.delete(`/video-questions/${id}`);
+      // TODO: Connect when video-questions backend API is ready
       console.log("Delete video question:", id);
     } catch (error) {
       console.error("Failed to delete video question:", error);
@@ -186,7 +122,7 @@ export const lessonService = {
 
     for (const question of questions) {
       try {
-        // In production: await apiClient.post(`/lessons/${lessonId}/questions`, question);
+        // TODO: Connect when video-questions backend API is ready
         console.log("Bulk add video question:", question);
         result.success++;
       } catch (error) {

@@ -4,7 +4,6 @@ import type {
   ExamQuestion,
   CreateExamInput,
   CreateExamQuestionInput,
-  QuestionType,
 } from "@/features/courses/types";
 
 export interface ExamData {
@@ -18,42 +17,11 @@ export const examService = {
    */
   async getExam(courseId: number): Promise<ExamData> {
     try {
-      // In production: const response = await apiClient.get<ExamData>(`/courses/${courseId}/exam`);
-
-      // Mock data
+      const response = await apiClient.get<any>(`/courses/${courseId}/exam`);
+      const exam = response.data || null;
       return {
-        exam: {
-          id: 1,
-          courseId,
-          title: "แบบทดสอบหลังเรียน",
-          description: "กรุณาทำแบบทดสอบเพื่อรับใบประกาศนียบัตร",
-          passingScorePercent: 80,
-          timeLimitMinutes: 30,
-          questions: [
-            {
-              id: 1,
-              examId: 1,
-              questionText: "ข้อใดคือหลักการสำคัญที่สุดในการให้คำปรึกษา?",
-              questionType: "MULTIPLE_CHOICE" as QuestionType,
-              scoreWeight: 5,
-            },
-            {
-              id: 2,
-              examId: 1,
-              questionText: "อธิบายขั้นตอนการดูแลผู้ป่วยโรคเรื้อรัง",
-              questionType: "FREE_TEXT" as QuestionType,
-              scoreWeight: 10,
-            },
-            {
-              id: 3,
-              examId: 1,
-              questionText: "ข้อใดไม่ถูกต้องเกี่ยวกับกฎหมายเภสัชกรรม?",
-              questionType: "MULTIPLE_CHOICE" as QuestionType,
-              scoreWeight: 5,
-            },
-          ],
-        },
-        questionsCount: 3,
+        exam,
+        questionsCount: exam?.questions?.length || 0,
       };
     } catch (error) {
       console.error("Failed to fetch exam:", error);
@@ -66,17 +34,13 @@ export const examService = {
    */
   async saveExam(data: CreateExamInput): Promise<Exam> {
     try {
-      // In production: const response = await apiClient.post<Exam>(`/courses/${data.courseId}/exam`, data);
-      console.log("Save exam:", data);
-      return {
-        id: Date.now(),
-        courseId: data.courseId,
+      const response = await apiClient.post<any>(`/courses/${data.courseId}/exam`, {
         title: data.title,
         description: data.description,
         passingScorePercent: data.passingScorePercent,
         timeLimitMinutes: data.timeLimitMinutes,
-        questions: [],
-      };
+      });
+      return response.data;
     } catch (error) {
       console.error("Failed to save exam:", error);
       throw error;
@@ -88,16 +52,8 @@ export const examService = {
    */
   async updateExam(id: number, data: Partial<CreateExamInput>): Promise<Exam> {
     try {
-      // In production: const response = await apiClient.put<Exam>(`/exams/${id}`, data);
-      console.log("Update exam:", id, data);
-      return {
-        id,
-        courseId: data.courseId || 0,
-        title: data.title || "",
-        description: data.description,
-        passingScorePercent: data.passingScorePercent,
-        timeLimitMinutes: data.timeLimitMinutes,
-      };
+      const response = await apiClient.put<any>(`/exams/${id}`, data);
+      return response.data;
     } catch (error) {
       console.error("Failed to update exam:", error);
       throw error;
@@ -109,8 +65,7 @@ export const examService = {
    */
   async deleteExam(id: number): Promise<void> {
     try {
-      // In production: await apiClient.delete(`/exams/${id}`);
-      console.log("Delete exam:", id);
+      await apiClient.delete(`/exams/${id}`);
     } catch (error) {
       console.error("Failed to delete exam:", error);
       throw error;
@@ -122,17 +77,14 @@ export const examService = {
    */
   async addExamQuestion(data: CreateExamQuestionInput): Promise<ExamQuestion> {
     try {
-      // In production: const response = await apiClient.post<ExamQuestion>(`/exams/${data.examId}/questions`, data);
-      console.log("Add exam question:", data);
-      return {
-        id: Date.now(),
-        examId: data.examId,
+      const response = await apiClient.post<any>(`/exams/${data.examId}/questions`, {
         questionText: data.questionText,
         questionType: data.questionType,
         options: data.options,
         scoreWeight: data.scoreWeight,
         correctAnswer: data.correctAnswer,
-      };
+      });
+      return response.data;
     } catch (error) {
       console.error("Failed to add exam question:", error);
       throw error;
@@ -147,16 +99,8 @@ export const examService = {
     data: Partial<CreateExamQuestionInput>
   ): Promise<ExamQuestion> {
     try {
-      // In production: const response = await apiClient.put<ExamQuestion>(`/exam-questions/${id}`, data);
-      console.log("Update exam question:", id, data);
-      return {
-        id,
-        examId: 0,
-        questionText: data.questionText,
-        questionType: data.questionType || "MULTIPLE_CHOICE",
-        options: data.options,
-        scoreWeight: data.scoreWeight,
-      };
+      const response = await apiClient.put<any>(`/exam-questions/${id}`, data);
+      return response.data;
     } catch (error) {
       console.error("Failed to update exam question:", error);
       throw error;
@@ -168,8 +112,7 @@ export const examService = {
    */
   async deleteExamQuestion(id: number): Promise<void> {
     try {
-      // In production: await apiClient.delete(`/exam-questions/${id}`);
-      console.log("Delete exam question:", id);
+      await apiClient.delete(`/exam-questions/${id}`);
     } catch (error) {
       console.error("Failed to delete exam question:", error);
       throw error;
@@ -187,8 +130,13 @@ export const examService = {
 
     for (const question of questions) {
       try {
-        // In production: await apiClient.post(`/exams/${examId}/questions`, question);
-        console.log("Bulk add exam question:", question);
+        await apiClient.post(`/exams/${examId}/questions`, {
+          questionText: question.questionText,
+          questionType: question.questionType,
+          options: question.options,
+          scoreWeight: question.scoreWeight,
+          correctAnswer: question.correctAnswer,
+        });
         result.success++;
       } catch (error) {
         result.failed++;

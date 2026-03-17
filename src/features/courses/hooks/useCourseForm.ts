@@ -167,9 +167,20 @@ export function useCourseForm(courseId?: string) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [details, setDetails] = useState(''); // รายละเอียดคอร์ส
-    const [categoryId, setCategoryId] = useState<string>('1');
-    const [subcategories, setSubcategories] = useState<string[]>([]);
+    const [categoryId, setCategoryId] = useState<string>('');
+    const [subcategoryId, setSubcategoryId] = useState<string>('');
     const [status, setStatus] = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT');
+    const [price, setPrice] = useState<number>(0);
+    const [cpeCredits, setCpeCredits] = useState<number>(0);
+    const [conferenceCode, setConferenceCode] = useState<string>('');
+    const [language, setLanguage] = useState<string>('Thai');
+    const [skillLevel, setSkillLevel] = useState<'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('ALL');
+    const [hasCertificate, setHasCertificate] = useState<boolean>(false);
+    const [enrollmentDeadline, setEnrollmentDeadline] = useState<string>('');
+    const [authorName, setAuthorName] = useState<string>('');
+    const [thumbnail, setThumbnail] = useState<string>('');
+    const [thumbnailMimeType, setThumbnailMimeType] = useState<string>('');
+    const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
 
     // Load initial data if editing
     useEffect(() => {
@@ -178,46 +189,99 @@ export function useCourseForm(courseId?: string) {
                 setTitle(data.title || '');
                 setDescription(data.description || '');
                 setDetails(data.details || '');
-                setCategoryId(data.categoryId?.toString() || '1');
+                setCategoryId(data.categoryId?.toString() || '');
+                setSubcategoryId(data.subcategoryId?.toString() || '');
                 setCourseType(data.price && Number(data.price) > 0 ? 'paid' : 'free');
-                setPreviewVideoId(data.previewVideoId);
-                setStatus(data.status || 'DRAFT');
+                setPrice(Number(data.price) || 0);
+                setCpeCredits(data.cpeCredits ?? 0);
+                setConferenceCode(data.conferenceCode || '');
+                setCeEnabled((data.cpeCredits ?? 0) > 0 || Boolean(data.conferenceCode));
+                setLanguage(data.language || 'Thai');
+                const normalizedSkillLevel = String(data.skillLevel || 'ALL').toUpperCase();
+                setSkillLevel(
+                    normalizedSkillLevel === 'BEGINNER' ||
+                        normalizedSkillLevel === 'INTERMEDIATE' ||
+                        normalizedSkillLevel === 'ADVANCED'
+                        ? normalizedSkillLevel
+                        : 'ALL'
+                );
+                setHasCertificate(Boolean(data.hasCertificate));
+                if (data.enrollmentDeadline) {
+                    const parsedDate = new Date(String(data.enrollmentDeadline));
+                    setEnrollmentDeadline(
+                        Number.isNaN(parsedDate.getTime()) ? '' : parsedDate.toISOString().slice(0, 10)
+                    );
+                } else {
+                    setEnrollmentDeadline('');
+                }
+                setAuthorName(data.authorName || '');
+                if (data.thumbnail) {
+                    setThumbnailPreview(data.thumbnail);
+                }
+                setPreviewVideoId(data.previewVideoId ?? null);
+                const normalizedStatus = String(data.status || 'DRAFT').toUpperCase();
+                setStatus(
+                    normalizedStatus === 'PUBLISHED' || normalizedStatus === 'ARCHIVED'
+                        ? normalizedStatus
+                        : 'DRAFT'
+                );
                 // Maps lessons and other data as needed
-                if (data.lessons) {
-                    setLessons(data.lessons);
+                if (Array.isArray(data.lessons)) {
+                    const normalizedLessons: FormLesson[] = data.lessons.map((lesson) => ({
+                        ...lesson,
+                        videoQuestions: Array.isArray(lesson.videoQuestions) ? lesson.videoQuestions : [],
+                    }));
+                    setLessons(normalizedLessons);
                 }
             });
         }
     }, [courseId]);
 
-    const createCourse = async () => {
-        const payload = {
+    const handleThumbnailSelect = (file: File) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64 = reader.result as string;
+            setThumbnailPreview(base64);
+            // Strip the data:...;base64, prefix for storage
+            const base64Data = base64.split(',')[1] || base64;
+            setThumbnail(base64Data);
+            setThumbnailMimeType(file.type);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const buildPayload = () => {
+        const parsedCategoryId = parseInt(categoryId, 10);
+        const parsedSubcategoryId = parseInt(subcategoryId, 10);
+        return {
             title,
             description,
             details,
-            categoryId: parseInt(categoryId, 10),
-            price: courseType === 'free' ? 0 : 0, // Default price 0 for now, should be from UI
+            categoryId: Number.isNaN(parsedCategoryId) ? undefined : parsedCategoryId,
+            subcategoryId: Number.isNaN(parsedSubcategoryId) ? undefined : parsedSubcategoryId,
+            price: courseType === 'free' ? 0 : price,
+            cpeCredits: ceEnabled ? cpeCredits : 0,
+            conferenceCode: ceEnabled ? conferenceCode || undefined : undefined,
+            language: language.trim() || undefined,
+            skillLevel,
+            hasCertificate,
+            enrollmentDeadline: enrollmentDeadline ? `${enrollmentDeadline}T00:00:00.000Z` : undefined,
+            authorName: authorName || undefined,
+            thumbnail: thumbnail || undefined,
+            thumbnailMimeType: thumbnailMimeType || undefined,
             previewVideoId,
             status,
         };
+    };
 
+    const createCourse = async () => {
+        const payload = buildPayload();
         return courseService.createCourse(payload);
     };
 
     const saveCourse = async () => {
         if (!courseId) return;
-
-        const payload = {
-            title,
-            description,
-            details, // Added details
-            categoryId: parseInt(categoryId, 10),
-            previewVideoId,
-            status,
-            // lessons, // TODO: Implement lesson synchronization
-            // videos: uploadedVideos,
-        };
-
+        const payload = buildPayload();
         return courseService.updateCourse(courseId, payload);
     };
 
@@ -227,7 +291,17 @@ export function useCourseForm(courseId?: string) {
         description, setDescription,
         details, setDetails,
         categoryId, setCategoryId,
-        subcategories, setSubcategories,
+        subcategoryId, setSubcategoryId,
+        price, setPrice,
+        cpeCredits, setCpeCredits,
+        conferenceCode, setConferenceCode,
+        language, setLanguage,
+        skillLevel, setSkillLevel,
+        hasCertificate, setHasCertificate,
+        enrollmentDeadline, setEnrollmentDeadline,
+        authorName, setAuthorName,
+        thumbnailPreview,
+        handleThumbnailSelect,
 
         // Actions
         saveCourse,

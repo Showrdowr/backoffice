@@ -1,66 +1,72 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import {
     ArrowLeft, Edit, Trash2, Copy, Users, TrendingUp, Star, Clock, Award,
     DollarSign, Calendar, Tag, PlayCircle, HelpCircle, BookOpen, Eye,
-    BarChart3, CheckCircle, Settings
+    BarChart3, CheckCircle, Settings, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-
-// Mock data
-const mockCourse = {
-    id: '1',
-    title: 'เภสัชศาสตร์คลินิก: การดูแลผู้ป่วยโรคเรื้อรัง',
-    description: 'คอร์สนี้จะสอนเกี่ยวกับการดูแลผู้ป่วยโรคเรื้อรัง การให้คำปรึกษาด้านยา และการติดตามผลการรักษา รวมถึงการประเมินความเสี่ยงและการป้องกันภาวะแทรกซ้อน',
-    thumbnail: '',
-    status: 'published' as const,
-    level: 'intermediate' as 'beginner' | 'intermediate' | 'advanced',
-    category: 'วิทยาลัยเภสัชบำบัด',
-    subcategories: ['โรคเรื้อรัง', 'ผู้สูงอายุ'],
-    tags: ['คำปรึกษา', 'การติดตามผล', 'เบาหวาน'],
-    price: 1500,
-    cpeCredits: 5,
-    lessons: 12,
-    quizzes: 3,
-    duration: '8 ชั่วโมง',
-    createdAt: '2024-01-15',
-    updatedAt: '2024-03-20',
-    publishedAt: '2024-02-01',
-    instructor: 'ดร. สมชาย ใจดี',
-};
-
-const mockStats = {
-    totalEnrolled: 156,
-    completionRate: 78,
-    averageRating: 4.5,
-    totalReviews: 42,
-    revenue: 234000,
-    thisMonthEnrolled: 23,
-};
-
-const mockLessons = [
-    { id: '1', title: 'บทนำ: ความสำคัญของการดูแลผู้ป่วยโรคเรื้อรัง', type: 'video', duration: '15:30', views: 156 },
-    { id: '2', title: 'โรคเบาหวาน: การประเมินและการให้คำปรึกษา', type: 'video', duration: '25:45', views: 142 },
-    { id: '3', title: 'โรคความดันโลหิตสูง: การจัดการและการติดตาม', type: 'video', duration: '30:00', views: 138 },
-    { id: '4', title: 'การประเมินความเสี่ยงและการป้องกันภาวะแทรกซ้อน', type: 'video', duration: '22:15', views: 125 },
-    { id: '5', title: 'แบบฝึกหัดท้ายบท', type: 'quiz', duration: '15:00', views: 120 },
-];
-
-const mockRecentEnrollments = [
-    { id: '1', name: 'สมชาย ใจดี', date: '22 ธ.ค. 2024', avatar: 'ส' },
-    { id: '2', name: 'สมหญิง รักเรียน', date: '21 ธ.ค. 2024', avatar: 'ส' },
-    { id: '3', name: 'วิภา มานะ', date: '20 ธ.ค. 2024', avatar: 'ว' },
-];
+import { useRouter } from 'next/navigation';
+import { courseService } from '@/features/courses/services/courseService';
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [course, setCourse] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleDelete = () => {
+    useEffect(() => {
+        async function loadCourse() {
+            try {
+                setIsLoading(true);
+                const data = await courseService.getCourse(id);
+                setCourse(data);
+            } catch (err) {
+                setError('ไม่พบคอร์สนี้');
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        loadCourse();
+    }, [id]);
+
+    const handleDelete = async () => {
         setShowDeleteModal(false);
-        console.log('Delete course:', id);
+        try {
+            await courseService.deleteCourse(Number(id));
+            router.push('/courses');
+        } catch (err) {
+            alert('เกิดข้อผิดพลาดในการลบคอร์ส');
+        }
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="animate-spin text-blue-500" size={40} />
+            </div>
+        );
+    }
+
+    if (error || !course) {
+        return (
+            <div className="text-center py-20">
+                <p className="text-slate-500 text-lg">{error || 'ไม่พบคอร์ส'}</p>
+                <Link href="/courses" className="text-blue-500 hover:underline mt-4 inline-block">กลับหน้ารายการคอร์ส</Link>
+            </div>
+        );
+    }
+
+    const lessonsData = course.lessons || [];
+    const categoryName = typeof course.category === 'object' ? course.category?.name : course.category || 'ไม่ระบุ';
+    const subcategoryName = typeof course.subcategory === 'object' ? course.subcategory?.name : '';
+    const coursePrice = Number(course.price) || 0;
+    const coursePriceLabel = coursePrice <= 0 ? 'ฟรี' : `฿${coursePrice.toLocaleString()}`;
+    const courseCpe = course.cpeCredits || 0;
+    const courseStatus = (course.status || 'DRAFT').toLowerCase();
 
     return (
         <div className="space-y-6">
@@ -73,14 +79,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                     <div>
                         <div className="flex items-center gap-3">
                             <h1 className="text-2xl font-bold text-slate-800">รายละเอียดคอร์ส</h1>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${mockCourse.status === 'published'
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${courseStatus === 'published'
                                 ? 'bg-emerald-100 text-emerald-700'
                                 : 'bg-amber-100 text-amber-700'
                                 }`}>
-                                {mockCourse.status === 'published' ? '✓ เผยแพร่แล้ว' : '● ฉบับร่าง'}
+                                {courseStatus === 'published' ? '✓ เผยแพร่แล้ว' : '● ฉบับร่าง'}
                             </span>
                         </div>
-                        <p className="text-slate-500">ID: {mockCourse.id}</p>
+                        <p className="text-slate-500">ID: {course.id}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -114,8 +120,8 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                             <div className="flex gap-6">
                                 {/* Thumbnail */}
                                 <div className="w-48 h-32 rounded-xl overflow-hidden bg-white/10 backdrop-blur flex-shrink-0 border border-white/20">
-                                    {mockCourse.thumbnail ? (
-                                        <img src={mockCourse.thumbnail} alt="" className="w-full h-full object-cover" />
+                                    {course.thumbnail ? (
+                                        <img src={course.thumbnail} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center">
                                             <BookOpen size={40} className="text-white/50" />
@@ -124,20 +130,20 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 </div>
                                 {/* Info */}
                                 <div className="flex-1">
-                                    <h2 className="text-2xl font-bold mb-2">{mockCourse.title}</h2>
-                                    <p className="text-white/80 mb-4 line-clamp-2">{mockCourse.description}</p>
+                                    <h2 className="text-2xl font-bold mb-2">{course.title}</h2>
+                                    <p className="text-white/80 mb-4 line-clamp-2">{course.description}</p>
                                     <div className="flex items-center gap-4 text-sm">
                                         <span className="flex items-center gap-1">
                                             <Clock size={16} />
-                                            {mockCourse.duration}
+                                            {lessonsData.length} บทเรียน
                                         </span>
                                         <span className="flex items-center gap-1">
                                             <PlayCircle size={16} />
-                                            {mockCourse.lessons} บทเรียน
+                                            {lessonsData.length} บท
                                         </span>
                                         <span className="flex items-center gap-1">
-                                            <HelpCircle size={16} />
-                                            {mockCourse.quizzes} แบบทดสอบ
+                                            <Award size={16} />
+                                            {courseCpe} CPE
                                         </span>
                                     </div>
                                 </div>
@@ -146,23 +152,23 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                         {/* Stats Row */}
                         <div className="grid grid-cols-4 divide-x divide-white/10 bg-white/10 backdrop-blur-sm">
                             <div className="p-4 text-center text-white">
-                                <p className="text-2xl font-bold">{mockStats.totalEnrolled}</p>
+                                <p className="text-2xl font-bold">{course.enrollmentsCount || 0}</p>
                                 <p className="text-xs text-white/70">ผู้เรียนทั้งหมด</p>
                             </div>
                             <div className="p-4 text-center text-white">
-                                <p className="text-2xl font-bold">{mockStats.completionRate}%</p>
-                                <p className="text-xs text-white/70">อัตราสำเร็จ</p>
+                                <p className="text-2xl font-bold">{lessonsData.length}</p>
+                                <p className="text-xs text-white/70">บทเรียน</p>
                             </div>
                             <div className="p-4 text-center text-white">
                                 <p className="text-2xl font-bold flex items-center justify-center gap-1">
-                                    <Star size={16} className="text-yellow-400" fill="currentColor" />
-                                    {mockStats.averageRating}
+                                    <Award size={16} className="text-yellow-400" />
+                                    {courseCpe}
                                 </p>
-                                <p className="text-xs text-white/70">{mockStats.totalReviews} รีวิว</p>
+                                <p className="text-xs text-white/70">CPE Credits</p>
                             </div>
                             <div className="p-4 text-center text-white">
-                                <p className="text-2xl font-bold">฿{(mockStats.revenue / 1000).toFixed(0)}k</p>
-                                <p className="text-xs text-white/70">รายได้</p>
+                                <p className="text-2xl font-bold">{coursePriceLabel}</p>
+                                <p className="text-xs text-white/70">ราคา</p>
                             </div>
                         </div>
                     </div>
@@ -183,24 +189,24 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                             </Link>
                         </div>
                         <div className="divide-y divide-slate-100">
-                            {mockLessons.map((lesson, idx) => (
+                            {lessonsData.length === 0 ? (
+                                <div className="p-8 text-center text-slate-400">
+                                    <PlayCircle size={32} className="mx-auto mb-2 opacity-50" />
+                                    <p>ยังไม่มีบทเรียน</p>
+                                </div>
+                            ) : lessonsData.map((lesson: any, idx: number) => (
                                 <div key={lesson.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-all">
                                     <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold">
-                                        {idx + 1}
+                                        {lesson.sequenceOrder || idx + 1}
                                     </div>
                                     <div className="flex-1">
                                         <h4 className="font-medium text-slate-800">{lesson.title}</h4>
                                         <div className="flex items-center gap-3 text-sm text-slate-500">
                                             <span className="flex items-center gap-1">
-                                                {lesson.type === 'video' ? <PlayCircle size={14} /> : <HelpCircle size={14} />}
-                                                {lesson.type === 'video' ? 'วิดีโอ' : 'แบบทดสอบ'}
+                                                <PlayCircle size={14} />
+                                                วิดีโอ
                                             </span>
-                                            <span>{lesson.duration}</span>
                                         </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-slate-600">{lesson.views} ครั้ง</p>
-                                        <p className="text-xs text-slate-400">ความนิยม</p>
                                     </div>
                                 </div>
                             ))}
@@ -215,22 +221,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 <h3 className="text-xl font-bold text-slate-800">ลงทะเบียนล่าสุด</h3>
                             </div>
                             <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">
-                                +{mockStats.thisMonthEnrolled} เดือนนี้
+                                {course.enrollmentsCount || 0} ทั้งหมด
                             </span>
                         </div>
                         <div className="p-4 space-y-3">
-                            {mockRecentEnrollments.map((user) => (
-                                <div key={user.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
-                                        {user.avatar}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-slate-800">{user.name}</p>
-                                        <p className="text-sm text-slate-500">{user.date}</p>
-                                    </div>
-                                    <CheckCircle size={18} className="text-emerald-500" />
-                                </div>
-                            ))}
+                            <div className="text-center py-6 text-slate-400">
+                                <Users size={28} className="mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">ยังไม่มีข้อมูลผู้ลงทะเบียน</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -244,14 +242,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 <DollarSign size={18} className="text-emerald-500" />
                                 <span className="text-sm text-slate-500">ราคา</span>
                             </div>
-                            <p className="text-xl font-bold text-slate-800">฿{mockCourse.price.toLocaleString()}</p>
+                            <p className="text-xl font-bold text-slate-800">{coursePriceLabel}</p>
                         </div>
                         <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
                             <div className="flex items-center gap-2 mb-2">
                                 <Award size={18} className="text-violet-500" />
                                 <span className="text-sm text-slate-500">CPE Credits</span>
                             </div>
-                            <p className="text-xl font-bold text-slate-800">{mockCourse.cpeCredits} หน่วย</p>
+                            <p className="text-xl font-bold text-slate-800">{courseCpe} หน่วย</p>
                         </div>
                     </div>
 
@@ -265,29 +263,17 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                             <div>
                                 <p className="text-sm text-slate-500 mb-2">หมวดหมู่หลัก</p>
                                 <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg font-medium">
-                                    {mockCourse.category}
+                                    {categoryName}
                                 </span>
                             </div>
-                            <div>
-                                <p className="text-sm text-slate-500 mb-2">หมวดหมู่ย่อย</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {mockCourse.subcategories.map((sub) => (
-                                        <span key={sub} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm">
-                                            {sub}
-                                        </span>
-                                    ))}
+                            {subcategoryName && (
+                                <div>
+                                    <p className="text-sm text-slate-500 mb-2">หมวดหมู่ย่อย</p>
+                                    <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                                        {subcategoryName}
+                                    </span>
                                 </div>
-                            </div>
-                            <div>
-                                <p className="text-sm text-slate-500 mb-2">แท็ก</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {mockCourse.tags.map((tag) => (
-                                        <span key={tag} className="px-2 py-1 bg-violet-50 text-violet-600 rounded text-xs font-medium">
-                                            #{tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
 
@@ -299,22 +285,20 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                         </h3>
                         <div className="space-y-3">
                             <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                                <span className="text-slate-500">ระดับ</span>
-                                <span className="font-medium text-slate-800">
-                                    {mockCourse.level === 'beginner' ? 'เริ่มต้น' : mockCourse.level === 'intermediate' ? 'ปานกลาง' : 'ขั้นสูง'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between py-2 border-b border-slate-100">
                                 <span className="text-slate-500">ผู้สอน</span>
-                                <span className="font-medium text-slate-800">{mockCourse.instructor}</span>
+                                <span className="font-medium text-slate-800">{course.authorName || 'ไม่ระบุ'}</span>
                             </div>
                             <div className="flex items-center justify-between py-2 border-b border-slate-100">
                                 <span className="text-slate-500">จำนวนบทเรียน</span>
-                                <span className="font-medium text-slate-800">{mockCourse.lessons} บท</span>
+                                <span className="font-medium text-slate-800">{lessonsData.length} บท</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                                <span className="text-slate-500">สถานะ</span>
+                                <span className="font-medium text-slate-800">{course.status}</span>
                             </div>
                             <div className="flex items-center justify-between py-2">
-                                <span className="text-slate-500">ระยะเวลา</span>
-                                <span className="font-medium text-slate-800">{mockCourse.duration}</span>
+                                <span className="text-slate-500">Conference Code</span>
+                                <span className="font-medium text-slate-800">{course.conferenceCode || '-'}</span>
                             </div>
                         </div>
                     </div>
@@ -332,7 +316,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 </div>
                                 <div>
                                     <p className="font-medium text-slate-800">เผยแพร่</p>
-                                    <p className="text-sm text-slate-500">{new Date(mockCourse.publishedAt).toLocaleDateString('th-TH')}</p>
+                                    <p className="text-sm text-slate-500">{course.publishedAt ? new Date(course.publishedAt).toLocaleDateString('th-TH') : '-'}</p>
                                 </div>
                             </div>
                             <div className="flex gap-3">
@@ -341,7 +325,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 </div>
                                 <div>
                                     <p className="font-medium text-slate-800">อัปเดตล่าสุด</p>
-                                    <p className="text-sm text-slate-500">{new Date(mockCourse.updatedAt).toLocaleDateString('th-TH')}</p>
+                                    <p className="text-sm text-slate-500">{course.updatedAt ? new Date(course.updatedAt).toLocaleDateString('th-TH') : '-'}</p>
                                 </div>
                             </div>
                             <div className="flex gap-3">
@@ -350,7 +334,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 </div>
                                 <div>
                                     <p className="font-medium text-slate-800">สร้างเมื่อ</p>
-                                    <p className="text-sm text-slate-500">{new Date(mockCourse.createdAt).toLocaleDateString('th-TH')}</p>
+                                    <p className="text-sm text-slate-500">{course.createdAt ? new Date(course.createdAt).toLocaleDateString('th-TH') : '-'}</p>
                                 </div>
                             </div>
                         </div>
@@ -382,7 +366,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                         </div>
                         <div className="p-6">
                             <p className="text-slate-600 mb-4">
-                                คุณต้องการลบคอร์ส "<span className="font-semibold">{mockCourse.title}</span>" ใช่หรือไม่?
+                                คุณต้องการลบคอร์ส "<span className="font-semibold">{course.title}</span>" ใช่หรือไม่?
                             </p>
                             <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg mb-6">
                                 ⚠️ การดำเนินการนี้ไม่สามารถย้อนกลับได้ และจะลบข้อมูลผู้เรียนทั้งหมด

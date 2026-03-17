@@ -1,6 +1,28 @@
 import { apiClient } from '@/services/api/client';
-import type { CoursesData, CategoriesData, CourseStatus } from '../types';
-import { VideoProvider } from '../../videos/types';
+import type { CoursesData, CategoriesData, CourseStatus, Category, Course } from '../types';
+
+type ApiCategoryRef = {
+    id?: number | string | null;
+    name?: string | null;
+};
+
+type ApiCourseRaw = Partial<Course> & {
+    id: number | string;
+    categoryId?: number | string | null;
+    category?: ApiCategoryRef | string | null;
+    lessons?: unknown[] | null;
+    lessonsCount?: number | null;
+    price?: number | string | null;
+    status?: string | null;
+    [key: string]: unknown;
+};
+
+type ApiRecord = Record<string, unknown>;
+type CourseResponse = Course & {
+    details?: string;
+    lessonsData?: Course['lessons'];
+    data?: { id?: number | string };
+};
 
 export const courseService = {
     /**
@@ -8,24 +30,42 @@ export const courseService = {
      */
     async getCourses(): Promise<CoursesData> {
         try {
-            const response = await apiClient.get<any[]>('/courses');
-            const courses = response.data;
+            const response = await apiClient.get<ApiCourseRaw[]>('/courses');
+            const courses = Array.isArray(response.data) ? response.data : [];
+            const normalizedCourses: Course[] = courses.map((c) => {
+                const normalizedStatus = String(c.status || 'DRAFT').toUpperCase() as CourseStatus;
+                const categoryRef = typeof c.category === 'object' && c.category ? c.category : undefined;
+                const resolvedCategoryId = c.categoryId ?? categoryRef?.id;
+                const categoryName = categoryRef?.name || c.category;
+                const authorName =
+                    (typeof c.authorName === 'string' && c.authorName.trim()) ? c.authorName :
+                        (typeof c['author_name'] === 'string' && c['author_name'].trim()) ? c['author_name'] as string :
+                            (typeof c.instructor === 'string' && c.instructor.trim()) ? c.instructor :
+                                '';
+
+                return {
+                    ...c,
+                    title: c.title || '',
+                    createdAt: c.createdAt || new Date().toISOString(),
+                    categoryId: resolvedCategoryId ? Number(resolvedCategoryId) : undefined,
+                    price: Number(c.price) || 0,
+                    status: normalizedStatus,
+                    category: categoryName || 'Uncategorized',
+                    lessonsCount: c.lessonsCount || (Array.isArray(c.lessons) ? c.lessons.length : 0),
+                    authorName,
+                } as Course;
+            });
             
             // Calculate stats based on real data
             const stats = {
-                total: courses.length,
-                published: courses.filter((c: any) => c.status === 'PUBLISHED').length,
-                draft: courses.filter((c: any) => c.status === 'DRAFT').length,
-                totalRevenue: courses.reduce((acc: number, c: any) => acc + (Number(c.price) || 0), 0),
+                total: normalizedCourses.length,
+                published: normalizedCourses.filter((c) => c.status === 'PUBLISHED').length,
+                draft: normalizedCourses.filter((c) => c.status === 'DRAFT').length,
+                totalRevenue: normalizedCourses.reduce((acc, c) => acc + (Number(c.price) || 0), 0),
             };
 
             return {
-                courses: courses.map((c: any) => ({
-                    ...c,
-                    price: Number(c.price) || 0,
-                    category: c.category?.name || 'Uncategorized',
-                    lessonsCount: c.lessons?.length || 0,
-                })),
+                courses: normalizedCourses,
                 stats
             };
         } catch (error) {
@@ -37,15 +77,27 @@ export const courseService = {
     /**
      * Get a single course by ID
      */
-    async getCourse(id: number | string): Promise<any> {
+    async getCourse(id: number | string): Promise<CourseResponse> {
         try {
-            const response = await apiClient.get<any>(`/courses/${id}`);
+            const response = await apiClient.get<ApiCourseRaw>(`/courses/${id}`);
             const course = response.data;
-            
+            const categoryRef = typeof course.category === 'object' && course.category ? course.category : undefined;
+            const categoryName = categoryRef?.name || course.category;
+            const authorName =
+                (typeof course.authorName === 'string' && course.authorName.trim()) ? course.authorName :
+                    (typeof course['author_name'] === 'string' && course['author_name'].trim()) ? course['author_name'] as string :
+                        (typeof course.instructor === 'string' && course.instructor.trim()) ? course.instructor :
+                            '';
+
             return {
                 ...course,
+                title: course.title || '',
+                createdAt: course.createdAt || new Date().toISOString(),
                 price: Number(course.price) || 0,
-            };
+                status: String(course.status || 'DRAFT').toUpperCase() as CourseStatus,
+                category: categoryName || 'Uncategorized',
+                authorName,
+            } as CourseResponse;
         } catch (error) {
             console.error('Failed to fetch course details:', error);
             throw error;
@@ -55,9 +107,9 @@ export const courseService = {
     /**
      * Get courses by category ID
      */
-    async getCoursesByCategory(categoryId: string): Promise<any[]> {
+    async getCoursesByCategory(categoryId: string): Promise<Course[]> {
         try {
-            const response = await apiClient.get<any[]>(`/courses?categoryId=${categoryId}`);
+            const response = await apiClient.get<Course[]>(`/courses?categoryId=${categoryId}`);
             return response.data;
         } catch (error) {
             console.error('Failed to fetch courses by category:', error);
@@ -70,7 +122,7 @@ export const courseService = {
     */
     async getCategories(): Promise<CategoriesData> {
         try {
-            const response = await apiClient.get<any[]>('/categories');
+            const response = await apiClient.get<Category[]>('/categories');
             return {
                 categories: response.data
             };
@@ -95,9 +147,9 @@ export const courseService = {
     /**
      * Create a new course
      */
-    async createCourse(data: any): Promise<any> {
+    async createCourse(data: ApiRecord): Promise<CourseResponse> {
         try {
-            const response = await apiClient.post<{ data: any }>('/courses', data);
+            const response = await apiClient.post<CourseResponse>('/courses', data);
             return response.data;
         } catch (error) {
             console.error('Failed to create course:', error);
@@ -108,9 +160,9 @@ export const courseService = {
     /**
      * Update an existing course
      */
-    async updateCourse(id: number | string, data: any): Promise<any> {
+    async updateCourse(id: number | string, data: ApiRecord): Promise<CourseResponse> {
         try {
-            const response = await apiClient.put<{ data: any }>(`/courses/${id}`, data);
+            const response = await apiClient.put<CourseResponse>(`/courses/${id}`, data);
             return response.data;
         } catch (error) {
             console.error('Failed to update course:', error);

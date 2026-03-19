@@ -44,6 +44,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         enrollmentDeadline, setEnrollmentDeadline,
         authorName, setAuthorName,
         thumbnailPreview,
+        thumbnailError,
         handleThumbnailSelect,
         saveCourse,
 
@@ -312,7 +313,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                                 <ImageIcon size={32} className="text-sky-500" />
                                             </div>
                                             <p className="text-sm font-semibold text-slate-700 mb-1">อัปโหลดรูปภาพ</p>
-                                            <p className="text-xs text-slate-500">แนะนำ: 1280x720px (JPG, PNG)</p>
+                                            <p className="text-xs text-slate-500">แนะนำ: 1280x720px (JPG, PNG, WEBP, ไม่เกิน 5MB)</p>
                                         </div>
                                     )}
                                     <input
@@ -325,6 +326,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                             if (file) handleThumbnailSelect(file);
                                         }}
                                     />
+                                    {thumbnailError && (
+                                        <p className="mt-3 text-sm font-semibold text-red-600">{thumbnailError}</p>
+                                    )}
                                 </div>
                             </div>
 

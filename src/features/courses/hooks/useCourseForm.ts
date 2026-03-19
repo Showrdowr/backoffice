@@ -5,6 +5,69 @@ import type { Question, QuestionType, ExamType, QuestionOption, ExamSettings, Vi
 import type { Video as VideoType } from '@/features/videos/types';
 import { courseService } from '../services/courseService';
 
+const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
+const MAX_THUMBNAIL_DIMENSION = 1920;
+const ALLOWED_THUMBNAIL_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('READ_FILE_FAILED'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('LOAD_IMAGE_FAILED'));
+        image.src = dataUrl;
+    });
+}
+
+async function resizeImageDataUrl(
+    dataUrl: string,
+    mimeType: string,
+    maxDimension: number
+): Promise<string> {
+    const image = await loadImage(dataUrl);
+    const originalWidth = image.naturalWidth || image.width;
+    const originalHeight = image.naturalHeight || image.height;
+
+    if (originalWidth <= maxDimension && originalHeight <= maxDimension) {
+        return dataUrl;
+    }
+
+    const scale = Math.min(maxDimension / originalWidth, maxDimension / originalHeight);
+    const targetWidth = Math.max(1, Math.round(originalWidth * scale));
+    const targetHeight = Math.max(1, Math.round(originalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+        throw new Error('CANVAS_CONTEXT_FAILED');
+    }
+
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+    if (mimeType === 'image/jpeg' || mimeType === 'image/webp') {
+        return canvas.toDataURL(mimeType, 0.92);
+    }
+
+    return canvas.toDataURL(mimeType);
+}
+
+function getBase64SizeBytes(base64Data: string): number {
+    const sanitized = base64Data.replace(/\s+/g, '');
+    const paddingMatch = sanitized.match(/=+$/);
+    const paddingLength = paddingMatch ? paddingMatch[0].length : 0;
+    return Math.max(0, Math.floor((sanitized.length * 3) / 4) - paddingLength);
+}
+
 // Use Lesson type directly or extend if needed for form-specific temporary states
 // But here we can mostly stick to the shared type
 export type FormLesson = Lesson & {
@@ -181,6 +244,7 @@ export function useCourseForm(courseId?: string) {
     const [thumbnail, setThumbnail] = useState<string>('');
     const [thumbnailMimeType, setThumbnailMimeType] = useState<string>('');
     const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
+    const [thumbnailError, setThumbnailError] = useState<string>('');
 
     // Load initial data if editing
     useEffect(() => {
@@ -237,17 +301,47 @@ export function useCourseForm(courseId?: string) {
         }
     }, [courseId]);
 
-    const handleThumbnailSelect = (file: File) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64 = reader.result as string;
-            setThumbnailPreview(base64);
-            // Strip the data:...;base64, prefix for storage
-            const base64Data = base64.split(',')[1] || base64;
+    const handleThumbnailSelect = async (file: File) => {
+        setThumbnailError('');
+
+        if (!ALLOWED_THUMBNAIL_MIME_TYPES.has(file.type)) {
+            setThumbnailError('รองรับเฉพาะไฟล์ JPG, PNG และ WEBP');
+            return;
+        }
+
+        if (file.size > MAX_THUMBNAIL_BYTES) {
+            setThumbnailError('ไฟล์รูปต้องไม่เกิน 5MB');
+            return;
+        }
+
+        try {
+            const originalDataUrl = await readFileAsDataUrl(file);
+            const resizedDataUrl = await resizeImageDataUrl(
+                originalDataUrl,
+                file.type,
+                MAX_THUMBNAIL_DIMENSION
+            );
+            const base64Data = resizedDataUrl.split(',')[1] || '';
+            if (!base64Data) {
+                throw new Error('INVALID_IMAGE_DATA');
+            }
+
+            const resizedBytes = getBase64SizeBytes(base64Data);
+            if (resizedBytes > MAX_THUMBNAIL_BYTES) {
+                setThumbnailError('ไฟล์รูปต้องไม่เกิน 5MB');
+                return;
+            }
+
+            const mimeMatch = resizedDataUrl.match(/^data:([^;]+);base64,/i);
+            const resolvedMimeType = (mimeMatch?.[1] || file.type).toLowerCase();
+
+            setThumbnailPreview(resizedDataUrl);
             setThumbnail(base64Data);
-            setThumbnailMimeType(file.type);
-        };
-        reader.readAsDataURL(file);
+            setThumbnailMimeType(resolvedMimeType);
+        } catch (error) {
+            console.error('Failed to process thumbnail:', error);
+            setThumbnailError('ไม่สามารถประมวลผลรูปภาพได้ กรุณาลองใหม่');
+        }
     };
 
     const buildPayload = () => {
@@ -301,6 +395,7 @@ export function useCourseForm(courseId?: string) {
         enrollmentDeadline, setEnrollmentDeadline,
         authorName, setAuthorName,
         thumbnailPreview,
+        thumbnailError,
         handleThumbnailSelect,
 
         // Actions

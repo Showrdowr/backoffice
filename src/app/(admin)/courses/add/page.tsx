@@ -75,7 +75,7 @@ export default function AddCoursePage() {
         enrollmentDeadline, setEnrollmentDeadline,
         ceEnabled, setCeEnabled,
         authorName, setAuthorName,
-        thumbnailPreview, handleThumbnailSelect,
+        thumbnailPreview, thumbnailError, handleThumbnailSelect,
         uploadedVideos, handleAddVideo, handleDeleteVideo,
         previewVideoId, handleSetPreviewVideo,
         createCourse,
@@ -380,7 +380,7 @@ export default function AddCoursePage() {
                                         <ImageIcon size={28} className="text-slate-400" />
                                     </div>
                                     <p className="text-sm font-semibold text-slate-700 mb-1">คลิกเพื่ออัปโหลดรูปภาพ</p>
-                                    <p className="text-xs text-slate-400">แนะนำ: 1280x720px (JPG, PNG)</p>
+                                    <p className="text-xs text-slate-400">แนะนำ: 1280x720px (JPG, PNG, WEBP, ไม่เกิน 5MB)</p>
                                 </div>
                             )}
                             <input
@@ -393,6 +393,9 @@ export default function AddCoursePage() {
                                     if (file) handleThumbnailSelect(file);
                                 }}
                             />
+                            {thumbnailError && (
+                                <p className="mt-3 text-sm font-semibold text-red-600">{thumbnailError}</p>
+                            )}
                         </div>
                     </div>
                 )}

@@ -14,6 +14,7 @@ export interface VideoQuestionCSVRow {
   questionText: string;
   questionType: string;
   displayAtSeconds: string;
+  sortOrder?: string;
   option1?: string;
   option2?: string;
   option3?: string;
@@ -109,12 +110,17 @@ function normalizeQuestionType(type: string): QuestionType {
   if (normalized === "MULTIPLE_CHOICE" || normalized === "MULTIPLE-CHOICE") {
     return "MULTIPLE_CHOICE";
   }
+  if (normalized === "TRUE_FALSE" || normalized === "TRUE-FALSE") {
+    return "TRUE_FALSE";
+  }
   if (
+    normalized === "SHORT_ANSWER" ||
+    normalized === "SHORT-ANSWER" ||
     normalized === "FREE_TEXT" ||
     normalized === "FREE-TEXT" ||
     normalized === "TEXT"
   ) {
-    return "FREE_TEXT";
+    return "SHORT_ANSWER";
   }
   return "MULTIPLE_CHOICE"; // default
 }
@@ -143,7 +149,7 @@ function validateVideoQuestionRow(
     errors.push({
       row: rowIndex,
       field: "questionType",
-      message: "กรุณาระบุประเภทคำถาม (MULTIPLE_CHOICE หรือ FREE_TEXT)",
+      message: "กรุณาระบุประเภทคำถาม (MULTIPLE_CHOICE, TRUE_FALSE หรือ SHORT_ANSWER)",
     });
   } else {
     const type = row.questionType.trim().toUpperCase();
@@ -151,6 +157,10 @@ function validateVideoQuestionRow(
       ![
         "MULTIPLE_CHOICE",
         "MULTIPLE-CHOICE",
+        "TRUE_FALSE",
+        "TRUE-FALSE",
+        "SHORT_ANSWER",
+        "SHORT-ANSWER",
         "FREE_TEXT",
         "FREE-TEXT",
         "TEXT",
@@ -159,7 +169,7 @@ function validateVideoQuestionRow(
       errors.push({
         row: rowIndex,
         field: "questionType",
-        message: "ประเภทคำถามไม่ถูกต้อง (ใช้ MULTIPLE_CHOICE หรือ FREE_TEXT)",
+        message: "ประเภทคำถามไม่ถูกต้อง (ใช้ MULTIPLE_CHOICE, TRUE_FALSE หรือ SHORT_ANSWER)",
       });
     }
   }
@@ -200,6 +210,17 @@ function validateVideoQuestionRow(
     }
   }
 
+  if (row.sortOrder && row.sortOrder.trim()) {
+    const sortOrder = parseInt(row.sortOrder, 10);
+    if (isNaN(sortOrder) || sortOrder < 0) {
+      errors.push({
+        row: rowIndex,
+        field: "sortOrder",
+        message: "ลำดับการแสดงต้องเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0",
+      });
+    }
+  }
+
   return errors;
 }
 
@@ -223,7 +244,7 @@ function validateExamQuestionRow(
     errors.push({
       row: rowIndex,
       field: "questionType",
-      message: "กรุณาระบุประเภทคำถาม (MULTIPLE_CHOICE หรือ FREE_TEXT)",
+      message: "กรุณาระบุประเภทคำถาม (MULTIPLE_CHOICE, TRUE_FALSE หรือ SHORT_ANSWER)",
     });
   } else {
     const type = row.questionType.trim().toUpperCase();
@@ -231,6 +252,10 @@ function validateExamQuestionRow(
       ![
         "MULTIPLE_CHOICE",
         "MULTIPLE-CHOICE",
+        "TRUE_FALSE",
+        "TRUE-FALSE",
+        "SHORT_ANSWER",
+        "SHORT-ANSWER",
         "FREE_TEXT",
         "FREE-TEXT",
         "TEXT",
@@ -239,7 +264,7 @@ function validateExamQuestionRow(
       errors.push({
         row: rowIndex,
         field: "questionType",
-        message: "ประเภทคำถามไม่ถูกต้อง (ใช้ MULTIPLE_CHOICE หรือ FREE_TEXT)",
+        message: "ประเภทคำถามไม่ถูกต้อง (ใช้ MULTIPLE_CHOICE, TRUE_FALSE หรือ SHORT_ANSWER)",
       });
     }
   }
@@ -310,7 +335,7 @@ export function parseVideoQuestionCSV(
               row.option3,
               row.option4
             );
-            const { options: updatedOptions, correctAnswer } = mapCorrectAnswer(
+            const { options: updatedOptions } = mapCorrectAnswer(
               row.correctAnswer,
               options
             );
@@ -319,10 +344,17 @@ export function parseVideoQuestionCSV(
               lessonId,
               questionText: row.questionText.trim(),
               displayAtSeconds: parseInt(row.displayAtSeconds, 10),
+              sortOrder: row.sortOrder ? parseInt(row.sortOrder, 10) : index,
               questionType,
               options:
-                questionType === "MULTIPLE_CHOICE" ? updatedOptions : undefined,
-              correctAnswer,
+                questionType === "MULTIPLE_CHOICE"
+                  ? updatedOptions
+                  : questionType === "TRUE_FALSE"
+                    ? [
+                        { id: "true", text: "จริง", isCorrect: false },
+                        { id: "false", text: "เท็จ", isCorrect: false },
+                      ]
+                    : undefined,
             });
           }
         });
@@ -431,9 +463,10 @@ export function parseExamQuestionCSV(
 // Template Generation
 // ==========================================
 
-export const VIDEO_QUESTION_CSV_TEMPLATE = `questionText,questionType,displayAtSeconds,option1,option2,option3,option4,correctAnswer
-"ตัวอย่างคำถาม 1 - Multiple Choice",MULTIPLE_CHOICE,300,"ตัวเลือก A","ตัวเลือก B","ตัวเลือก C","ตัวเลือก D",A
-"ตัวอย่างคำถาม 2 - Free Text",FREE_TEXT,600,,,,,`;
+export const VIDEO_QUESTION_CSV_TEMPLATE = `questionText,questionType,displayAtSeconds,sortOrder,option1,option2,option3,option4
+"ตัวอย่างคำถาม 1 - Multiple Choice",MULTIPLE_CHOICE,300,0,"ตัวเลือก A","ตัวเลือก B","ตัวเลือก C","ตัวเลือก D"
+"ตัวอย่างคำถาม 2 - True False",TRUE_FALSE,420,1,,,,
+"ตัวอย่างคำถาม 3 - Short Answer",SHORT_ANSWER,600,2,,,,`;
 
 export const EXAM_QUESTION_CSV_TEMPLATE = `questionText,questionType,scoreWeight,option1,option2,option3,option4,correctAnswer
 "ตัวอย่างคำถาม 1 - Multiple Choice",MULTIPLE_CHOICE,5,"ตัวเลือก A","ตัวเลือก B","ตัวเลือก C","ตัวเลือก D",A

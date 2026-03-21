@@ -12,6 +12,9 @@ export function CECreditsSection({ ceEnabled, onCeEnabledChange, cpeCredits = 0,
         <div className="bg-white rounded-2xl shadow-md border border-sky-100">
             <div className="p-6 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-100 rounded-t-2xl">
                 <h2 className="text-xl font-bold text-slate-800">CPE Credit</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                    ใช้เมื่อคอร์สนี้ให้หน่วยสะสมวิชาชีพหรืออ้างอิงกับงานประชุม/รหัสกิจกรรม
+                </p>
             </div>
             <div className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
@@ -30,6 +33,9 @@ export function CECreditsSection({ ceEnabled, onCeEnabledChange, cpeCredits = 0,
                     <>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">จำนวน CPE Credit</label>
+                            <p className="mb-2 text-xs text-slate-500">
+                                จำนวนหน่วยที่ผู้เรียนจะได้รับเมื่อผ่านเงื่อนไขของคอร์สนี้
+                            </p>
                             <input
                                 type="number"
                                 min={0}
@@ -43,6 +49,9 @@ export function CECreditsSection({ ceEnabled, onCeEnabledChange, cpeCredits = 0,
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">Conference Code</label>
+                            <p className="mb-2 text-xs text-slate-500">
+                                รหัสอ้างอิงของงานประชุมหรือกิจกรรม ถ้าไม่มีสามารถเว้นว่างได้
+                            </p>
                             <input
                                 type="text"
                                 value={conferenceCode}

@@ -1,86 +1,263 @@
-// Mock Vimeo Service - จำลอง Vimeo API
-// TODO: เปลี่ยนเป็น Vimeo API จริงทีหลัง
+import * as tus from 'tus-js-client';
+import { ApiError, apiClient } from '@/services/api/client';
+import type { Video, VideoStatus } from '../types';
 
-import { VideoProvider } from '@/features/videos/types';
-
-export interface VimeoUploadResult {
+export interface VimeoUploadResult extends Video {
     videoId: string;
-    duration: number;
+    persistedVideoId: number;
     thumbnailUrl?: string;
 }
 
 export interface UploadProgress {
     percent: number;
-    status: 'uploading' | 'processing' | 'complete' | 'error';
+    status: 'idle' | 'uploading' | 'processing' | 'complete' | 'failed' | 'canceled';
 }
 
-// Simulate upload delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export interface ResolvedVimeoVideo {
+    resourceId: string;
+    videoUri: string;
+    name: string | null;
+    duration: number | null;
+    sourceUrl: string | null;
+    playbackUrl: string | null;
+    privacyView: string | null;
+    privacyEmbed: string | null;
+    uploadStatus: string | null;
+    transcodeStatus: string | null;
+}
+
+type InitiateUploadResponse = {
+    uploadSessionId: string;
+    resourceId: string;
+    videoUri: string;
+    provider: 'VIMEO';
+    uploadStrategy: 'tus';
+    uploadLink: string;
+};
+
+type VideoApiResponse = {
+    id: number;
+    name: string | null;
+    provider: string;
+    resourceId: string;
+    duration: number | null;
+    playbackUrl?: string | null;
+    status: VideoStatus;
+    createdAt: string | null;
+    updatedAt: string | null;
+    usage?: {
+        previewCourseCount?: number;
+        lessonUsageCount?: number;
+        totalUsageCount?: number;
+    } | null;
+};
+
+function buildClientError(message: string, code?: string) {
+    return Object.assign(new Error(message), { code });
+}
+
+function normalizeVideo(video: VideoApiResponse): Video {
+    return {
+        id: video.id,
+        name: video.name,
+        provider: video.provider as Video['provider'],
+        resourceId: video.resourceId,
+        duration: video.duration,
+        playbackUrl: video.playbackUrl ?? null,
+        status: video.status ?? 'PROCESSING',
+        createdAt: video.createdAt ?? null,
+        updatedAt: video.updatedAt ?? null,
+        usage: {
+            previewCourseCount: Number(video.usage?.previewCourseCount ?? 0),
+            lessonUsageCount: Number(video.usage?.lessonUsageCount ?? 0),
+            totalUsageCount: Number(video.usage?.totalUsageCount ?? 0),
+        },
+    };
+}
+
+export function getVimeoErrorMessage(error: unknown, fallback = 'เกิดข้อผิดพลาดเกี่ยวกับวิดีโอ กรุณาลองใหม่อีกครั้ง') {
+    if (error instanceof ApiError) {
+        switch (error.code) {
+            case 'VIMEO_INVALID_URL':
+                return 'ลิงก์หรือ Video ID ของ Vimeo ไม่ถูกต้อง';
+            case 'VIMEO_NOT_CONFIGURED':
+                return 'ระบบ Vimeo ยังไม่ได้ตั้งค่า access token';
+            case 'VIMEO_EMBED_ORIGINS_NOT_CONFIGURED':
+                return 'ระบบ Vimeo ยังไม่ได้ตั้งค่าโดเมนที่อนุญาตให้ฝังวิดีโอ';
+            case 'VIMEO_RESOLVE_FAILED':
+                return 'ไม่พบวิดีโอนี้ใน Vimeo หรือ token ของระบบไม่มีสิทธิ์เข้าถึง';
+            case 'VIMEO_INITIATE_FAILED':
+                return 'เริ่มต้นอัปโหลดวิดีโอไปยัง Vimeo ไม่สำเร็จ';
+            case 'VIMEO_COMPLETE_FAILED':
+            case 'VIMEO_UPLOAD_FAILED':
+                return 'อัปโหลดเสร็จแล้วแต่ระบบบันทึกข้อมูลวิดีโอไม่สำเร็จ';
+            case 'VIMEO_IMPORT_FAILED':
+                return 'นำเข้าวิดีโอจาก Vimeo ไม่สำเร็จ';
+            case 'VIDEO_IN_USE':
+                return 'วิดีโอนี้กำลังถูกใช้งานอยู่ จึงยังไม่สามารถลบได้';
+            default:
+                return error.message || fallback;
+        }
+    }
+
+    if (error instanceof Error) {
+        const code = (error as Error & { code?: string }).code;
+        if (code === 'UPLOAD_CANCELED') {
+            return 'ยกเลิกการอัปโหลดแล้ว';
+        }
+        return error.message || fallback;
+    }
+
+    return fallback;
+}
+
+function tusUpload(
+    uploadLink: string,
+    file: File,
+    onProgress?: (progress: UploadProgress) => void,
+): { promise: Promise<void>; abort: () => void } {
+    let abortFn: (() => void) | null = null;
+
+    const promise = new Promise<void>((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+            uploadUrl: uploadLink,
+            endpoint: uploadLink,
+            retryDelays: [0, 1000, 3000, 5000],
+            chunkSize: 64 * 1024 * 1024,
+            metadata: {
+                filename: file.name,
+                filetype: file.type || 'video/mp4',
+            },
+            onProgress(bytesUploaded, bytesTotal) {
+                const percent = Math.min(95, Math.round((bytesUploaded / bytesTotal) * 95));
+                onProgress?.({ percent, status: 'uploading' });
+            },
+            onSuccess() {
+                resolve();
+            },
+            onError(error) {
+                onProgress?.({ percent: 0, status: 'failed' });
+                reject(buildClientError(error.message || 'อัปโหลดวิดีโอไปยัง Vimeo ไม่สำเร็จ', 'UPLOAD_FAILED'));
+            },
+        });
+
+        abortFn = () => {
+            upload.abort(true);
+            onProgress?.({ percent: 0, status: 'canceled' });
+            reject(buildClientError('อัปโหลดถูกยกเลิก', 'UPLOAD_CANCELED'));
+        };
+
+        upload.start();
+    });
+
+    return { promise, abort: () => abortFn?.() };
+}
+
+const VIMEO_URL_PATTERNS = [
+    /vimeo\.com\/video\/(\d+)/,
+    /vimeo\.com\/channels\/[^/]+\/(\d+)/,
+    /vimeo\.com\/groups\/[^/]+\/videos\/(\d+)/,
+    /vimeo\.com\/showcase\/[^/]+\/video\/(\d+)/,
+    /player\.vimeo\.com\/video\/(\d+)/,
+    /vimeo\.com\/(\d+)/,
+];
+
+let activeAbort: (() => void) | null = null;
 
 export const vimeoService = {
-    /**
-     * Mock upload to Vimeo
-     * In production: use Vimeo tus-js-client for resumable uploads
-     */
     async uploadVideo(
         file: File,
-        onProgress?: (progress: UploadProgress) => void
+        onProgress?: (progress: UploadProgress) => void,
+        customName?: string
     ): Promise<VimeoUploadResult> {
-        // Simulate upload progress
-        for (let i = 0; i <= 100; i += 10) {
-            await delay(200);
-            onProgress?.({
-                percent: i,
-                status: i < 100 ? 'uploading' : 'processing'
-            });
+        const resolvedName = customName?.trim() || file.name.replace(/\.[^/.]+$/, '');
+
+        const initiateResponse = await apiClient.post<InitiateUploadResponse>('/videos/vimeo/initiate', {
+            fileName: resolvedName || file.name,
+            fileSize: file.size,
+            mimeType: file.type || 'video/mp4',
+        });
+
+        const uploadSession = initiateResponse.data;
+
+        const { promise, abort } = tusUpload(uploadSession.uploadLink, file, onProgress);
+        activeAbort = abort;
+
+        try {
+            await promise;
+        } finally {
+            activeAbort = null;
         }
 
-        // Simulate processing
-        await delay(500);
+        onProgress?.({ percent: 97, status: 'processing' });
 
-        // Generate mock Vimeo video ID
-        const mockVideoId = `${Date.now()}`;
+        try {
+            const completeResponse = await apiClient.post<{
+                id: number;
+                resourceId: string;
+                duration: number;
+                name: string | null;
+                provider: string;
+                status: VideoStatus;
+                createdAt: string | null;
+                updatedAt: string | null;
+                usage?: {
+                    previewCourseCount?: number;
+                    lessonUsageCount?: number;
+                    totalUsageCount?: number;
+                } | null;
+            }>('/videos/vimeo/complete', {
+                uploadSessionId: uploadSession.uploadSessionId,
+                name: resolvedName,
+                provider: uploadSession.provider,
+                resourceId: uploadSession.resourceId,
+                videoUri: uploadSession.videoUri,
+            });
 
-        // Mock duration based on file size (1MB = ~10 seconds)
-        const mockDuration = Math.round(file.size / 100000);
+            onProgress?.({ percent: 100, status: 'complete' });
 
-        onProgress?.({ percent: 100, status: 'complete' });
-
-        return {
-            videoId: mockVideoId,
-            duration: mockDuration > 0 ? mockDuration : 300, // minimum 5 minutes
-            thumbnailUrl: undefined, // Vimeo generates thumbnails automatically
-        };
+            const video = normalizeVideo(completeResponse.data);
+            return {
+                ...video,
+                videoId: completeResponse.data.resourceId,
+                persistedVideoId: completeResponse.data.id,
+                thumbnailUrl: undefined,
+            };
+        } catch (error) {
+            onProgress?.({ percent: 97, status: 'failed' });
+            throw error;
+        }
     },
 
-    /**
-     * Get video info from Vimeo
-     * In production: call Vimeo API /videos/{video_id}
-     */
-    async getVideoInfo(videoId: string): Promise<{
-        duration: number;
-        thumbnailUrl?: string;
-        title?: string;
-    }> {
-        // Mock response
-        return {
-            duration: 1800, // 30 minutes
-            thumbnailUrl: `https://i.vimeocdn.com/video/${videoId}_640x360.jpg`,
-            title: 'Video from Vimeo',
-        };
+    cancelUpload() {
+        activeAbort?.();
+        activeAbort = null;
     },
 
-    /**
-     * Parse Vimeo URL to get video ID
-     * Supports: https://vimeo.com/123456789, https://player.vimeo.com/video/123456789
-     */
+    async resolveExistingVideo(input: string): Promise<ResolvedVimeoVideo> {
+        const resourceId = this.parseVimeoUrl(input);
+        const payload = resourceId ? { resourceId } : { url: input };
+
+        const response = await apiClient.post<ResolvedVimeoVideo>('/videos/vimeo/resolve', payload);
+        return response.data;
+    },
+
+    async importExistingVideo(input: string, name?: string): Promise<Video> {
+        const resourceId = this.parseVimeoUrl(input);
+        const payload = resourceId
+            ? { resourceId, ...(name ? { name } : {}) }
+            : { url: input, ...(name ? { name } : {}) };
+
+        const response = await apiClient.post<VideoApiResponse>('/videos/vimeo/import', payload);
+        return normalizeVideo(response.data);
+    },
+
     parseVimeoUrl(url: string): string | null {
-        const patterns = [
-            /vimeo\.com\/(\d+)/,
-            /player\.vimeo\.com\/video\/(\d+)/,
-        ];
+        if (/^\d+$/.test(url.trim())) {
+            return url.trim();
+        }
 
-        for (const pattern of patterns) {
+        for (const pattern of VIMEO_URL_PATTERNS) {
             const match = url.match(pattern);
             if (match) {
                 return match[1];

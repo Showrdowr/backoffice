@@ -67,7 +67,8 @@ export function ExamSection({
                         {/* CSV Import Button */}
                         <button
                             onClick={() => setIsImportModalOpen(true)}
-                            className="flex items-center gap-2 border border-violet-300 text-violet-600 px-4 py-2.5 rounded-xl hover:bg-violet-50 transition-all text-sm font-semibold"
+                            disabled={!examId}
+                            className="flex items-center gap-2 border border-violet-300 text-violet-600 px-4 py-2.5 rounded-xl hover:bg-violet-50 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Import จาก CSV"
                         >
                             <Upload size={18} />
@@ -106,23 +107,24 @@ export function ExamSection({
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            จำนวนครั้งที่ทำได้
+                            เวลาจำกัด (นาที)
                         </label>
                         <select
-                            value={examSettings.maxAttempts}
+                            value={examSettings.timeLimit}
                             onChange={(e) =>
                                 onSettingsChange({
                                     ...examSettings,
-                                    maxAttempts: e.target.value === 'unlimited' ? 'unlimited' : Number(e.target.value),
+                                    timeLimit: e.target.value === 'unlimited' ? 'unlimited' : Number(e.target.value),
                                 })
                             }
                             className="w-full px-4 py-3 border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all bg-white"
                         >
                             <option value="unlimited">ไม่จำกัด</option>
-                            <option value="1">1 ครั้ง</option>
-                            <option value="2">2 ครั้ง</option>
-                            <option value="3">3 ครั้ง</option>
-                            <option value="5">5 ครั้ง</option>
+                            <option value="15">15 นาที</option>
+                            <option value="30">30 นาที</option>
+                            <option value="45">45 นาที</option>
+                            <option value="60">60 นาที</option>
+                            <option value="90">90 นาที</option>
                         </select>
                     </div>
                 </div>
@@ -140,7 +142,8 @@ export function ExamSection({
                         <div className="flex items-center justify-center gap-3">
                             <button
                                 onClick={() => setIsImportModalOpen(true)}
-                                className="inline-flex items-center gap-2 border border-violet-300 text-violet-600 px-5 py-2.5 rounded-xl hover:bg-violet-50 transition-all text-sm font-semibold"
+                                disabled={!examId}
+                                className="inline-flex items-center gap-2 border border-violet-300 text-violet-600 px-5 py-2.5 rounded-xl hover:bg-violet-50 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Upload size={18} />
                                 Import CSV

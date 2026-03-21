@@ -5,7 +5,7 @@ interface CourseExamTabProps {
     questions: Question[];
     examSettings: {
         minPassingScore: number;
-        maxAttempts: number | 'unlimited';
+        timeLimit: number | 'unlimited';
     };
 }
 
@@ -24,9 +24,9 @@ export function CourseExamTab({ questions, examSettings }: CourseExamTabProps) {
                         <p className="text-2xl font-bold text-violet-600">{examSettings.minPassingScore}%</p>
                     </div>
                     <div className="bg-white rounded-lg p-4">
-                        <p className="text-sm text-slate-600 mb-1">จำนวนครั้งที่ทำได้</p>
+                        <p className="text-sm text-slate-600 mb-1">เวลาจำกัด</p>
                         <p className="text-2xl font-bold text-violet-600">
-                            {examSettings.maxAttempts === 'unlimited' ? 'ไม่จำกัด' : `${examSettings.maxAttempts} ครั้ง`}
+                            {examSettings.timeLimit === 'unlimited' ? 'ไม่จำกัด' : `${examSettings.timeLimit} นาที`}
                         </p>
                     </div>
                 </div>

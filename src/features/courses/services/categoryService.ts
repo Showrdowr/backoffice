@@ -4,11 +4,8 @@ import type { Category, Subcategory } from '../types';
 export const categoryService = {
     // Category operations
     async getCategories(): Promise<Category[]> {
-        const response = await apiClient.get<any>('/categories');
-        const categoriesObj = Array.isArray(response.data) ? response.data : 
-                             (response.data?.data && Array.isArray(response.data.data)) ? response.data.data :
-                             Array.isArray(response) ? response : [];
-        return categoriesObj as Category[];
+        const response = await apiClient.get<Category[]>('/categories');
+        return Array.isArray(response.data) ? response.data : [];
     },
 
     async getCategoryById(id: number | string): Promise<Category | null> {

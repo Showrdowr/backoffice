@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { categoryService } from '@/features/courses/services/categoryService';
 import { courseService } from '@/features/courses/services/courseService';
 import type { Category, Course } from '@/features/courses/types';
+import { getCategoryColorClasses } from '@/features/courses/utils/categoryColors';
 
 export default function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -22,12 +23,8 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
             setCategory(cat);
 
             if (cat) {
-                const { courses: allCourses } = await courseService.getCourses();
-                // Filter courses that belong to this category
-                const filtered = allCourses.filter(c => 
-                    c.categoryId?.toString() === cat.id.toString()
-                );
-                setCourses(filtered);
+                const categoryCourses = await courseService.getCoursesByCategory(String(cat.id));
+                setCourses(categoryCourses);
             }
         } catch (error) {
             console.error('Failed to load category data:', error);
@@ -75,7 +72,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
             </Link>
 
             {/* Category Hero */}
-            <div className={`bg-gradient-to-br from-${category.color || 'violet'}-500 to-${category.color || 'violet'}-600 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden`}>
+            <div className={`${getCategoryColorClasses(category.color).hero} rounded-2xl shadow-xl p-8 text-white relative overflow-hidden`}>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
                 <div className="flex items-start gap-6 relative z-10">
                     <div className={`w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-lg`}>
@@ -124,7 +121,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                     }`}
                             >
-                                {sub.name}
+                                {sub.name} ({sub.courseCount ?? 0})
                             </button>
                         ))}
                     </div>

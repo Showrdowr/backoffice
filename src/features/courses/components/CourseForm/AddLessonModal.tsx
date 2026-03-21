@@ -1,17 +1,11 @@
-import { useState, useRef } from 'react';
-import { X, FileText, Trash2, Upload, Video, ChevronDown, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { X, FileText, Trash2, Upload, AlertCircle } from 'lucide-react';
 import type { Video as VideoType } from '@/features/videos/types';
-import { vimeoService, type UploadProgress } from '@/features/videos/services/vimeoService';
-import { VideoProvider } from '@/features/videos/types';
-
-interface UploadedDocument {
-    id: string;
-    name: string;
-    size: string;
-    type: string;
-}
-
+import type { LessonDocument } from '../../types';
 import type { VideoQuestion } from '../../types';
+import { VideoPickerPanel } from './VideoPickerPanel';
+
+const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 
 interface LessonData {
     title: string;
@@ -19,6 +13,7 @@ interface LessonData {
     duration: string;
     description: string;
     videoQuestions: VideoQuestion[];
+    documents: LessonDocument[];
 }
 
 interface AddLessonModalProps {
@@ -27,91 +22,33 @@ interface AddLessonModalProps {
     onAdd: (lesson: LessonData) => void;
     lessonData: LessonData;
     onChange: (data: LessonData) => void;
-    availableVideos: VideoType[]; // Videos uploaded for this course
+    availableVideos: VideoType[];
     onVideoUpload: (video: VideoType) => void;
 }
 
-function formatDuration(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+function formatDuration(seconds: number | null | undefined): string {
+    const safeSeconds = Math.max(0, Math.floor(Number(seconds || 0)));
+    const mins = Math.floor(safeSeconds / 60);
+    const secs = safeSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, availableVideos, onVideoUpload }: AddLessonModalProps) {
-    const [documents, setDocuments] = useState<UploadedDocument[]>([]);
-    const [activeTab, setActiveTab] = useState<'select' | 'upload'>('select');
-
-    // Upload State
-    const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
-    const [uploadError, setUploadError] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [modalError, setModalError] = useState<string | null>(null);
+    const [isVideoPickerBusy, setIsVideoPickerBusy] = useState(false);
 
     if (!isOpen) return null;
 
-    const selectedVideo = availableVideos.find(v => v.id === lessonData.videoId);
+    const selectedVideo = availableVideos.find((video) => video.id === lessonData.videoId);
 
-    const handleVideoSelect = (videoId: number) => {
-        const video = availableVideos.find(v => v.id === videoId);
-        if (video) {
-            onChange({
-                ...lessonData,
-                videoId: video.id,
-                duration: formatDuration(video.duration),
-            });
-        }
-    };
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Validations
-        if (!file.type.startsWith('video/')) {
-            setUploadError('กรุณาเลือกไฟล์วิดีโอเท่านั้น');
-            return;
-        }
-        if (file.size > 500 * 1024 * 1024) {
-            setUploadError('ไฟล์ใหญ่เกินไป (สูงสุด 500MB)');
-            return;
-        }
-
-        try {
-            setUploadError(null);
-            // Default title from filename if empty
-            if (!lessonData.title) {
-                onChange({ ...lessonData, title: file.name.replace(/\.[^/.]+$/, '') });
-            }
-
-            const result = await vimeoService.uploadVideo(file, setUploadProgress);
-
-            const newVideo: VideoType = {
-                id: Date.now(),
-                name: file.name.replace(/\.[^/.]+$/, ''),
-                provider: VideoProvider.VIMEO,
-                resourceId: result.videoId,
-                duration: result.duration,
-                createdAt: new Date().toISOString(),
-            };
-
-            // Add to parent list
-            onVideoUpload(newVideo);
-
-            // Auto-select this video
-            onChange({
-                ...lessonData,
-                title: lessonData.title || newVideo.name,
-                videoId: newVideo.id,
-                duration: formatDuration(newVideo.duration),
-            });
-
-            // Switch back to select tab to show it selected
-            setActiveTab('select');
-            setUploadProgress(null);
-
-        } catch (err) {
-            setUploadError('เกิดข้อผิดพลาดในการอัพโหลด กรุณาลองใหม่');
-            setUploadProgress(null);
-        }
+    const handleVideoReady = (video: VideoType) => {
+        onVideoUpload(video);
+        onChange({
+            ...lessonData,
+            videoId: video.id,
+            duration: formatDuration(video.duration),
+            title: lessonData.title || video.name || '',
+        });
     };
 
     const handleSubmit = () => {
@@ -120,227 +57,152 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
         }
     };
 
-    const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
+    const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
         if (files) {
-            const newDocs: UploadedDocument[] = Array.from(files).map((file, idx) => ({
-                id: `doc-${Date.now()}-${idx}`,
-                name: file.name,
-                size: formatFileSize(file.size),
-                type: file.type.split('/')[1]?.toUpperCase() || 'FILE',
-            }));
-            setDocuments([...documents, ...newDocs]);
+            const nextDocuments: LessonDocument[] = [];
+            for (const [idx, file] of Array.from(files).entries()) {
+                if (file.size > MAX_DOCUMENT_BYTES) {
+                    setModalError('ไฟล์เอกสารต้องไม่เกิน 5MB ต่อไฟล์');
+                    continue;
+                }
+
+                const fileUrl = await readFileAsDataUrl(file);
+                nextDocuments.push({
+                    id: `doc-${Date.now()}-${idx}`,
+                    lessonId: 0,
+                    fileName: file.name,
+                    mimeType: file.type || 'application/octet-stream',
+                    sizeBytes: file.size,
+                    fileUrl,
+                });
+            }
+            onChange({
+                ...lessonData,
+                documents: [...lessonData.documents, ...nextDocuments],
+            });
         }
-        e.target.value = '';
+        event.target.value = '';
     };
 
     const removeDocument = (id: string) => {
-        setDocuments(documents.filter(doc => doc.id !== id));
+        onChange({
+            ...lessonData,
+            documents: lessonData.documents.filter((doc) => String(doc.id) !== id),
+        });
     };
 
     const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
-    const isUploading = uploadProgress !== null && uploadProgress.status !== 'complete';
-
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-slide-in max-h-[90vh] overflow-y-auto">
-                <div className="p-6 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded-t-2xl flex items-center justify-between sticky top-0 z-10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fade-in">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl animate-slide-in">
+                <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-sky-500 to-blue-500 p-6 text-white">
                     <div>
                         <h3 className="text-2xl font-bold">เพิ่มบทเรียนใหม่</h3>
-                        <p className="text-sky-100 text-sm mt-1">เพิ่มเนื้อหาบทเรียนในคอร์สของคุณ</p>
+                        <p className="mt-1 text-sm text-sky-100">เพิ่มวิดีโอ เอกสาร และข้อมูลพื้นฐานของบทเรียน</p>
                     </div>
                     <button
                         onClick={onClose}
-                        disabled={isUploading}
-                        className="p-2 hover:bg-white/20 rounded-xl transition-all disabled:opacity-50"
+                        disabled={isVideoPickerBusy}
+                        className="rounded-xl p-2 transition-all hover:bg-white/20 disabled:opacity-50"
                     >
                         <X size={24} />
                     </button>
                 </div>
-                <div className="p-6 space-y-5">
-                    {/* Lesson Title */}
+
+                <div className="space-y-5 p-6">
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">
                             ชื่อบทเรียน <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
                             value={lessonData.title}
-                            onChange={(e) => onChange({ ...lessonData, title: e.target.value })}
-                            className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all"
+                            onChange={(event) => onChange({ ...lessonData, title: event.target.value })}
+                            className="w-full rounded-xl border border-sky-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
                             placeholder="เช่น: บทที่ 1: บทนำ"
-                            disabled={isUploading}
+                            disabled={isVideoPickerBusy}
                         />
                     </div>
 
-                    {/* Video Selection / Upload Tabs */}
                     <div>
-                        <div className="flex items-center gap-4 mb-3 border-b border-slate-200">
-                            <button
-                                onClick={() => setActiveTab('select')}
-                                className={`pb-2 text-sm font-semibold transition-all relative ${activeTab === 'select' ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                เลือกวิดีโอที่มีอยู่
-                                {activeTab === 'select' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-sky-600 rounded-t-full" />}
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('upload')}
-                                className={`pb-2 text-sm font-semibold transition-all relative ${activeTab === 'upload' ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                อัพโหลดวิดีโอใหม่
-                                {activeTab === 'upload' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-sky-600 rounded-t-full" />}
-                            </button>
-                        </div>
-
-                        {activeTab === 'select' ? (
-                            availableVideos.length === 0 ? (
-                                <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50">
-                                    <p className="text-sm text-slate-500 mb-3">ยังไม่มีวิดีโอในคลัง</p>
-                                    <button
-                                        onClick={() => setActiveTab('upload')}
-                                        className="text-sky-600 font-semibold text-sm hover:underline"
-                                    >
-                                        อัพโหลดวิดีโอใหม่
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                                    {availableVideos.map((video) => (
-                                        <label
-                                            key={video.id}
-                                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${lessonData.videoId === video.id
-                                                ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-200'
-                                                : 'border-slate-100 hover:border-sky-200 hover:bg-slate-50'
-                                                }`}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="video"
-                                                checked={lessonData.videoId === video.id}
-                                                onChange={() => handleVideoSelect(video.id)}
-                                                className="sr-only"
-                                            />
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${lessonData.videoId === video.id
-                                                ? 'bg-sky-500'
-                                                : 'bg-slate-100'
-                                                }`}>
-                                                <Video size={16} className={lessonData.videoId === video.id ? 'text-white' : 'text-slate-500'} />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-slate-800 text-sm truncate">{video.name}</p>
-                                                <p className="text-xs text-slate-500">{formatDuration(video.duration)}</p>
-                                            </div>
-                                            {lessonData.videoId === video.id && (
-                                                <div className="w-5 h-5 bg-sky-500 rounded-full flex items-center justify-center shrink-0">
-                                                    <CheckCircle size={12} className="text-white" />
-                                                </div>
-                                            )}
-                                        </label>
-                                    ))}
-                                </div>
-                            )
-                        ) : (
-                            <div className="space-y-4">
-                                {!isUploading ? (
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="border-2 border-dashed border-sky-300 rounded-xl p-8 text-center bg-gradient-to-br from-sky-50 to-blue-50 hover:border-sky-400 transition-all cursor-pointer group"
-                                    >
-                                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mx-auto mb-3 shadow-md group-hover:scale-110 transition-transform">
-                                            <Upload size={24} className="text-sky-500" />
-                                        </div>
-                                        <p className="text-sm font-semibold text-slate-700">คลิกเพื่อเลือกไฟล์วิดีโอ</p>
-                                        <p className="text-xs text-slate-500 mt-1">รองรับ MP4, MOV, AVI (สูงสุด 500MB)</p>
-                                    </div>
-                                ) : (
-                                    <div className="border border-sky-200 rounded-xl p-6 bg-sky-50">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-semibold text-sky-700">กำลังอัพโหลด...</span>
-                                            <span className="text-sm font-bold text-sky-600">{uploadProgress?.percent}%</span>
-                                        </div>
-                                        <div className="w-full bg-white rounded-full h-2.5 overflow-hidden border border-sky-100">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-sky-400 to-blue-500 transition-all duration-300 rounded-full"
-                                                style={{ width: `${uploadProgress?.percent}%` }}
-                                            />
-                                        </div>
-                                        <p className="text-xs text-slate-500 mt-2 text-center">กรุณาอย่าปิดหน้าต่างนี้จนกว่าจะเสร็จสิ้น</p>
-                                    </div>
-                                )}
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="video/*"
-                                    onChange={handleFileUpload}
-                                    className="hidden"
-                                />
-                                {uploadError && (
-                                    <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">
-                                        <AlertCircle size={16} />
-                                        {uploadError}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <label className="mb-3 block text-sm font-semibold text-slate-700">
+                            วิดีโอบทเรียน <span className="text-red-500">*</span>
+                        </label>
+                        <p className="mb-3 text-xs text-slate-500">เลือกจากคลัง อัปโหลดใหม่ หรือใช้ลิงก์ Vimeo เดิมก็ได้ หลังเลือกแล้วระบบจะผูกวิดีโอนี้เข้ากับบทเรียนทันที</p>
+                        <VideoPickerPanel
+                            modes={['library', 'upload', 'existing']}
+                            availableVideos={availableVideos}
+                            selectedVideoId={lessonData.videoId}
+                            onSelectVideo={(video) => {
+                                onChange({
+                                    ...lessonData,
+                                    videoId: video.id,
+                                    duration: formatDuration(video.duration),
+                                });
+                            }}
+                            onVideoReady={handleVideoReady}
+                            onVideoRefresh={onVideoUpload}
+                            preferredName={lessonData.title}
+                            onBusyChange={setIsVideoPickerBusy}
+                            libraryEmptyText="ยังไม่มีวิดีโอในคลังสำหรับคอร์สนี้"
+                        />
                     </div>
 
-                    {/* Duration (auto-filled from selected video) */}
                     {selectedVideo && (
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                ระยะเวลา
-                            </label>
+                            <label className="mb-2 block text-sm font-semibold text-slate-700">ระยะเวลา</label>
                             <input
                                 type="text"
                                 value={lessonData.duration}
                                 readOnly
-                                className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-600"
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600"
                             />
+                            {selectedVideo.status !== 'READY' && (
+                                <p className={`mt-2 text-xs ${selectedVideo.status === 'PROCESSING' ? 'text-amber-600' : 'text-red-600'}`}>
+                                    {selectedVideo.status === 'PROCESSING'
+                                        ? 'วิดีโอนี้ยังประมวลผลไม่เสร็จ จึงยังพรีวิวไม่ได้ แต่สามารถผูกกับบทเรียนไว้ก่อนได้'
+                                        : 'วิดีโอนี้มีปัญหา กรุณาซิงก์สถานะใหม่หรือนำเข้า/อัปโหลดใหม่'}
+                                </p>
+                            )}
                         </div>
                     )}
 
-                    {/* Description */}
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            คำอธิบาย
-                        </label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">คำอธิบาย</label>
                         <textarea
                             value={lessonData.description}
-                            onChange={(e) => onChange({ ...lessonData, description: e.target.value })}
+                            onChange={(event) => onChange({ ...lessonData, description: event.target.value })}
                             rows={3}
-                            className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all"
+                            className="w-full rounded-xl border border-sky-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
                             placeholder="รายละเอียดเนื้อหาบทเรียน (ไม่บังคับ)"
-                            disabled={isUploading}
+                            disabled={isVideoPickerBusy}
                         />
                     </div>
 
-                    {/* Document Upload Section */}
                     <div className="border-t border-slate-200 pt-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-3">
-                            เอกสารประกอบการเรียน
-                        </label>
+                        <label className="mb-3 block text-sm font-semibold text-slate-700">เอกสารประกอบการเรียน</label>
 
-                        {/* Uploaded Documents List */}
-                        {documents.length > 0 && (
-                            <div className="space-y-2 mb-4">
-                                {documents.map((doc) => (
-                                    <div key={doc.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        {lessonData.documents.length > 0 && (
+                            <div className="mb-4 space-y-2">
+                                {lessonData.documents.map((doc) => (
+                                    <div key={doc.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100">
                                             <FileText size={20} className="text-blue-600" />
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-slate-800 text-sm truncate">{doc.name}</p>
-                                            <p className="text-xs text-slate-500">{doc.type} • {doc.size}</p>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium text-slate-800">{doc.fileName}</p>
+                                            <p className="text-xs text-slate-500">{doc.mimeType} • {formatFileSize(doc.sizeBytes)}</p>
                                         </div>
                                         <button
-                                            onClick={() => removeDocument(doc.id)}
-                                            className="p-2 hover:bg-red-50 rounded-lg transition-all"
-                                            disabled={isUploading}
+                                            onClick={() => removeDocument(String(doc.id))}
+                                            className="rounded-lg p-2 transition-all hover:bg-red-50"
+                                            disabled={isVideoPickerBusy}
                                         >
                                             <Trash2 size={16} className="text-red-500" />
                                         </button>
@@ -349,14 +211,13 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                             </div>
                         )}
 
-                        {/* Document Upload Area */}
-                        <div className={`border-2 border-dashed border-emerald-300 rounded-xl p-5 text-center bg-gradient-to-br from-emerald-50 to-teal-50 hover:border-emerald-400 transition-all ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center mx-auto mb-2 shadow-sm">
+                        <div className={`rounded-xl border-2 border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 text-center transition-all hover:border-emerald-400 ${isVideoPickerBusy ? 'pointer-events-none opacity-50' : ''}`}>
+                            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm">
                                 <Upload size={20} className="text-emerald-500" />
                             </div>
-                            <p className="text-sm font-semibold text-slate-700 mb-1">อัพโหลดเอกสารประกอบ</p>
-                            <p className="text-xs text-slate-500 mb-3">รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด 50MB)</p>
-                            <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg font-semibold text-sm hover:bg-emerald-600 transition-all cursor-pointer">
+                            <p className="mb-1 text-sm font-semibold text-slate-700">อัปโหลดเอกสารประกอบ</p>
+                            <p className="mb-3 text-xs text-slate-500">รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด 5MB ต่อไฟล์)</p>
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-600">
                                 <Upload size={16} />
                                 เลือกไฟล์
                                 <input
@@ -365,39 +226,47 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                     multiple
                                     className="hidden"
                                     onChange={handleDocumentUpload}
-                                    disabled={isUploading}
+                                    disabled={isVideoPickerBusy}
                                 />
                             </label>
                         </div>
-                        <p className="text-xs text-slate-400 mt-2">
-                            สามารถอัพโหลดได้หลายไฟล์ เอกสารเหล่านี้จะแสดงให้ผู้เรียนดาวน์โหลดในหน้าบทเรียน
-                        </p>
+                        <p className="mt-2 text-xs text-slate-400">เอกสารเหล่านี้จะแสดงให้ผู้เรียนดาวน์โหลดจากหน้าบทเรียน</p>
                     </div>
+
+                    {modalError && (
+                        <div className="flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-600">
+                            <AlertCircle size={16} />
+                            {modalError}
+                        </div>
+                    )}
                 </div>
-                <div className="p-6 bg-slate-50 rounded-b-2xl flex items-center justify-end gap-3 sticky bottom-0">
+
+                <div className="sticky bottom-0 flex items-center justify-end gap-3 rounded-b-2xl bg-slate-50 p-6">
                     <button
                         onClick={onClose}
-                        disabled={isUploading}
-                        className="px-5 py-2.5 border border-slate-200 rounded-xl hover:bg-white transition-all font-semibold disabled:opacity-50"
+                        disabled={isVideoPickerBusy}
+                        className="rounded-xl border border-slate-200 px-5 py-2.5 font-semibold transition-all hover:bg-white disabled:opacity-50"
                     >
                         ยกเลิก
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={!lessonData.title || !lessonData.videoId || isUploading}
-                        className="px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        disabled={!lessonData.title || !lessonData.videoId || isVideoPickerBusy}
+                        className="rounded-xl bg-gradient-to-r from-sky-500 to-blue-500 px-5 py-2.5 font-semibold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {isUploading ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                กำลังบันทึก...
-                            </>
-                        ) : (
-                            'เพิ่มบทเรียน'
-                        )}
+                        {isVideoPickerBusy ? 'กำลังบันทึก...' : 'เพิ่มบทเรียน'}
                     </button>
                 </div>
             </div>
         </div>
     );
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('READ_FILE_FAILED'));
+        reader.readAsDataURL(file);
+    });
 }

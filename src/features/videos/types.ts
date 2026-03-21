@@ -4,44 +4,53 @@ export enum VideoProvider {
     VIMEO = 'VIMEO',
 }
 
+export type VideoStatus = 'PROCESSING' | 'READY' | 'FAILED';
+
+export interface VideoUsage {
+    previewCourseCount: number;
+    lessonUsageCount: number;
+    totalUsageCount: number;
+}
+
 export interface Video {
     id: number;
-    name: string; // Admin internal name / title
+    name: string | null;
     provider: VideoProvider;
-    resourceId: string; // Video ID from provider (externalId)
-    duration: number; // Seconds
-    categoryId?: string; // Course category
-    createdAt: string;
+    resourceId: string;
+    duration: number | null;
+    playbackUrl: string | null;
+    status: VideoStatus;
+    createdAt: string | null;
+    updatedAt: string | null;
+    usage: VideoUsage;
 }
 
 export interface VideoStats {
     total: number;
-    totalDuration?: number; // Total seconds
-    totalDurationHours?: number; // Total hours (computed)
-    byProvider?: {
-        vimeo: number;
-    };
-    byCategory?: Record<string, number>; // count by category ID
+    totalDurationSeconds: number;
+    totalDurationHours: number;
+    byProvider: Record<string, number>;
+    byStatus: Record<string, number>;
+}
+
+export interface VideoPagination {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+
+export interface VideoListFilters {
+    search?: string;
+    provider?: VideoProvider;
+    status?: VideoStatus;
+    used?: boolean;
+    page?: number;
+    limit?: number;
 }
 
 export interface VideosData {
     videos: Video[];
     stats: VideoStats;
-}
-
-// Form input interfaces
-export interface CreateVideoInput {
-    name: string;
-    provider: VideoProvider;
-    resourceId: string;
-    duration?: number;
-    categoryId?: string;
-}
-
-export interface UpdateVideoInput {
-    name?: string;
-    provider?: VideoProvider;
-    resourceId?: string;
-    duration?: number;
-    categoryId?: string;
+    pagination: VideoPagination;
 }

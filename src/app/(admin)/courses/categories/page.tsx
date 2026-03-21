@@ -8,12 +8,15 @@ import { useRouter } from 'next/navigation';
 import { categoryService } from '@/features/courses/services/categoryService';
 import type { Category } from '@/features/courses/types';
 import { useAuth } from '@/features/auth/auth-context';
+import { ApiError } from '@/services/api/client';
+import { getCategoryColorClasses } from '@/features/courses/utils/categoryColors';
 
 export default function CategoriesPage() {
     const router = useRouter();
     const { isAdmin } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
+    const [actionError, setActionError] = useState('');
 
     useEffect(() => {
         loadData();
@@ -35,10 +38,16 @@ export default function CategoriesPage() {
         if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบหมวดหมู่นี้?')) return;
         
         try {
+            setActionError('');
             await categoryService.deleteCategory(id);
             await loadData();
-        } catch {
-            console.error('Failed to delete category');
+        } catch (error) {
+            console.error('Failed to delete category', error);
+            if (error instanceof ApiError && error.code === 'CATEGORY_IN_USE') {
+                setActionError('ไม่สามารถลบหมวดหมู่นี้ได้ เพราะยังมีคอร์สใช้งานอยู่ในหมวด');
+                return;
+            }
+            setActionError(error instanceof Error ? error.message : 'ลบหมวดหมู่ไม่สำเร็จ');
         }
     };
 
@@ -64,6 +73,12 @@ export default function CategoriesPage() {
                     </Link>
                 )}
             </div>
+
+            {actionError && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                    {actionError}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-8">
                 {/* Categories Table */}
@@ -101,7 +116,7 @@ export default function CategoriesPage() {
                                             >
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 ${category.color ? `bg-${category.color}-500` : 'bg-violet-500'} rounded-lg flex items-center justify-center shadow-sm`}>
+                                                        <div className={`w-10 h-10 ${getCategoryColorClasses(category.color).iconBg} rounded-lg flex items-center justify-center shadow-sm`}>
                                                             <TagIcon size={20} className="text-white" />
                                                         </div>
                                                         <div>

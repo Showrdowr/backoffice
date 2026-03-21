@@ -1,6 +1,20 @@
 import { API_CONFIG } from '@/config/constants';
 import type { ApiResponse, PaginatedResponse } from '@/types';
 
+export class ApiError extends Error {
+    statusCode: number;
+    code?: string;
+    details?: unknown;
+
+    constructor(message: string, options?: { statusCode?: number; code?: string; details?: unknown }) {
+        super(message);
+        this.name = 'ApiError';
+        this.statusCode = options?.statusCode || 500;
+        this.code = options?.code;
+        this.details = options?.details;
+    }
+}
+
 class ApiClient {
     private baseURL: string;
     private timeout: number;
@@ -53,7 +67,11 @@ class ApiClient {
                         message += path ? ` (${path}: ${first.message})` : ` (${first.message})`;
                     }
                 }
-                throw new Error(message);
+                throw new ApiError(message, {
+                    statusCode: response.status,
+                    code: errorData.code,
+                    details: errorData.details,
+                });
             }
 
             const data = await response.json();

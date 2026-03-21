@@ -1,11 +1,10 @@
-// Videos Feature Hooks
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { videoService } from './services/videoService';
-import type { Video, VideosData, CreateVideoInput, UpdateVideoInput } from './types';
+import type { Video, VideoListFilters, VideosData } from './types';
 
-export function useVideos() {
+export function useVideos(filters?: VideoListFilters) {
     const [data, setData] = useState<VideosData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -14,21 +13,21 @@ export function useVideos() {
         try {
             setIsLoading(true);
             setError(null);
-            const videosData = await videoService.getVideos();
+            const videosData = await videoService.getVideos(filters);
             setData(videosData);
         } catch (err) {
             setError(err instanceof Error ? err : new Error('Failed to load videos'));
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [filters]);
 
     useEffect(() => {
-        fetchData();
+        void fetchData();
     }, [fetchData]);
 
-    const createVideo = async (input: CreateVideoInput) => {
-        const video = await videoService.createVideo(input);
+    const syncVideoStatus = async (id: number) => {
+        const video = await videoService.syncVideoStatus(id);
         await fetchData();
         return video;
     };
@@ -41,12 +40,12 @@ export function useVideos() {
     return {
         videos: data?.videos || [],
         stats: data?.stats,
+        pagination: data?.pagination,
         isLoading,
         error,
         refresh: fetchData,
         getVideo: (id: number) => videoService.getVideo(id),
-        getVideosByCategory: (id: string) => videoService.getVideosByCategory(id),
-        createVideo,
+        syncVideoStatus,
         deleteVideo,
     };
 }
@@ -56,27 +55,29 @@ export function useVideo(id: number) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                setIsLoading(true);
-                setError(null);
-                const videoData = await videoService.getVideo(id);
-                setVideo(videoData);
-            } catch (err) {
-                setError(err instanceof Error ? err : new Error('Failed to load video'));
-            } finally {
-                setIsLoading(false);
-            }
-        }
-
-        if (id) {
-            fetchData();
+    const fetchData = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            const videoData = await videoService.getVideo(id);
+            setVideo(videoData);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Failed to load video'));
+        } finally {
+            setIsLoading(false);
         }
     }, [id]);
 
-    const updateVideo = async (data: UpdateVideoInput) => {
-        const updated = await videoService.updateVideo(id, data);
+    useEffect(() => {
+        if (!id) {
+            return;
+        }
+
+        void fetchData();
+    }, [fetchData, id]);
+
+    const syncVideoStatus = async () => {
+        const updated = await videoService.syncVideoStatus(id);
         setVideo(updated);
         return updated;
     };
@@ -85,6 +86,7 @@ export function useVideo(id: number) {
         video,
         isLoading,
         error,
-        updateVideo,
+        refresh: fetchData,
+        syncVideoStatus,
     };
 }

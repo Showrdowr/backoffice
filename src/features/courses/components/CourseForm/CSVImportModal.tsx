@@ -204,15 +204,15 @@ export function CSVImportModal({ isOpen, onClose, type, targetId, onImport }: CS
                                     {type === 'video' ? (
                                         <>
                                             <li>• <code className="bg-slate-200 px-1 rounded">questionText</code> - ข้อความคำถาม</li>
-                                            <li>• <code className="bg-slate-200 px-1 rounded">questionType</code> - MULTIPLE_CHOICE หรือ FREE_TEXT</li>
+                                            <li>• <code className="bg-slate-200 px-1 rounded">questionType</code> - MULTIPLE_CHOICE, TRUE_FALSE หรือ SHORT_ANSWER</li>
                                             <li>• <code className="bg-slate-200 px-1 rounded">displayAtSeconds</code> - เวลาที่แสดง (วินาที)</li>
-                                            <li>• <code className="bg-slate-200 px-1 rounded">option1-4</code> - ตัวเลือก (สำหรับ Multiple Choice)</li>
-                                            <li>• <code className="bg-slate-200 px-1 rounded">correctAnswer</code> - A, B, C, หรือ D</li>
+                                            <li>• <code className="bg-slate-200 px-1 rounded">sortOrder</code> - ลำดับคำถามเมื่อมีหลายข้อในเวลาเดียวกัน</li>
+                                            <li>• <code className="bg-slate-200 px-1 rounded">option1-4</code> - ตัวเลือก (จำเป็นเฉพาะ Multiple Choice)</li>
                                         </>
                                     ) : (
                                         <>
                                             <li>• <code className="bg-slate-200 px-1 rounded">questionText</code> - ข้อความคำถาม</li>
-                                            <li>• <code className="bg-slate-200 px-1 rounded">questionType</code> - MULTIPLE_CHOICE หรือ FREE_TEXT</li>
+                                            <li>• <code className="bg-slate-200 px-1 rounded">questionType</code> - MULTIPLE_CHOICE, TRUE_FALSE หรือ SHORT_ANSWER</li>
                                             <li>• <code className="bg-slate-200 px-1 rounded">scoreWeight</code> - คะแนน (ค่าเริ่มต้น: 1)</li>
                                             <li>• <code className="bg-slate-200 px-1 rounded">option1-4</code> - ตัวเลือก (สำหรับ Multiple Choice)</li>
                                             <li>• <code className="bg-slate-200 px-1 rounded">correctAnswer</code> - A, B, C, หรือ D</li>
@@ -302,15 +302,22 @@ export function CSVImportModal({ isOpen, onClose, type, targetId, onImport }: CS
                                                                 text-xs px-2 py-1 rounded-full font-medium
                                                                 ${question.questionType === 'MULTIPLE_CHOICE'
                                                                     ? 'bg-blue-100 text-blue-700'
-                                                                    : 'bg-green-100 text-green-700'
+                                                                    : question.questionType === 'TRUE_FALSE'
+                                                                        ? 'bg-amber-100 text-amber-700'
+                                                                        : 'bg-green-100 text-green-700'
                                                                 }
                                                             `}>
-                                                                {question.questionType === 'MULTIPLE_CHOICE' ? 'ตัวเลือก' : 'เขียนตอบ'}
+                                                                {question.questionType === 'MULTIPLE_CHOICE'
+                                                                    ? 'ตัวเลือก'
+                                                                    : question.questionType === 'TRUE_FALSE'
+                                                                        ? 'จริง/เท็จ'
+                                                                        : 'เขียนตอบ'}
                                                             </span>
                                                         </td>
                                                         {type === 'video' && 'displayAtSeconds' in question && (
                                                             <td className="px-4 py-2 text-slate-600">
-                                                                {question.displayAtSeconds}s
+                                                                {question.displayAtSeconds}s{' '}
+                                                                {'sortOrder' in question && question.sortOrder !== undefined ? `(ลำดับ ${question.sortOrder})` : ''}
                                                             </td>
                                                         )}
                                                         {type === 'exam' && 'scoreWeight' in question && (

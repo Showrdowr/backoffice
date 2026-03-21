@@ -17,7 +17,7 @@ export const examService = {
    */
   async getExam(courseId: number): Promise<ExamData> {
     try {
-      const response = await apiClient.get<any>(`/courses/${courseId}/exam`);
+      const response = await apiClient.get<Exam | null>(`/courses/${courseId}/exam`);
       const exam = response.data || null;
       return {
         exam,
@@ -34,7 +34,7 @@ export const examService = {
    */
   async saveExam(data: CreateExamInput): Promise<Exam> {
     try {
-      const response = await apiClient.post<any>(`/courses/${data.courseId}/exam`, {
+      const response = await apiClient.post<Exam>(`/courses/${data.courseId}/exam`, {
         title: data.title,
         description: data.description,
         passingScorePercent: data.passingScorePercent,
@@ -52,7 +52,7 @@ export const examService = {
    */
   async updateExam(id: number, data: Partial<CreateExamInput>): Promise<Exam> {
     try {
-      const response = await apiClient.put<any>(`/exams/${id}`, data);
+      const response = await apiClient.put<Exam>(`/exams/${id}`, data);
       return response.data;
     } catch (error) {
       console.error("Failed to update exam:", error);
@@ -77,7 +77,7 @@ export const examService = {
    */
   async addExamQuestion(data: CreateExamQuestionInput): Promise<ExamQuestion> {
     try {
-      const response = await apiClient.post<any>(`/exams/${data.examId}/questions`, {
+      const response = await apiClient.post<ExamQuestion>(`/exams/${data.examId}/questions`, {
         questionText: data.questionText,
         questionType: data.questionType,
         options: data.options,
@@ -99,7 +99,7 @@ export const examService = {
     data: Partial<CreateExamQuestionInput>
   ): Promise<ExamQuestion> {
     try {
-      const response = await apiClient.put<any>(`/exam-questions/${id}`, data);
+      const response = await apiClient.put<ExamQuestion>(`/exam-questions/${id}`, data);
       return response.data;
     } catch (error) {
       console.error("Failed to update exam question:", error);

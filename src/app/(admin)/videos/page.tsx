@@ -48,10 +48,9 @@ export default function VideosPage() {
 
     return (
         <div className="space-y-8">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg">
                         <Video size={28} className="text-white" />
                     </div>
                     <div>
@@ -60,7 +59,6 @@ export default function VideosPage() {
                     </div>
                 </div>
 
-                {/* Search */}
                 <div className="relative w-full md:w-96">
                     <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -68,38 +66,37 @@ export default function VideosPage() {
                         placeholder="ค้นหาหมวดหมู่..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all shadow-sm"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 pl-12 pr-4 shadow-sm transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
                     />
                 </div>
             </div>
 
-            {/* Category Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredCategories.map((category) => (
                     <Link
                         key={category.id}
                         href={`/videos/category/${category.id}`}
-                        className="group relative bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden"
+                        className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-xl"
                     >
-                        <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${getCategoryColorClass(category.color || 'slate')} opacity-10 rounded-bl-full group-hover:scale-110 transition-transform`} />
+                        <div className={`absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-gradient-to-br ${getCategoryColorClass(category.color || 'slate')} opacity-10 transition-transform group-hover:scale-110`} />
 
-                        <div className="flex items-start justify-between mb-4">
-                            <div className={`w-14 h-14 rounded-2xl bg-${category.color || 'slate'}-50 flex items-center justify-center group-hover:scale-105 transition-transform`}>
+                        <div className="mb-4 flex items-start justify-between">
+                            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-${category.color || 'slate'}-50 transition-transform group-hover:scale-105`}>
                                 <Folder size={28} className={`text-${category.color || 'slate'}-600`} />
                             </div>
-                            <span className="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-semibold rounded-full border border-slate-100">
+                            <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                                 {category.courseCount} คอร์ส
                             </span>
                         </div>
 
-                        <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-sky-600 transition-colors">
+                        <h3 className="mb-2 text-xl font-bold text-slate-800 transition-colors group-hover:text-sky-600">
                             {category.name}
                         </h3>
-                        <p className="text-slate-500 text-sm line-clamp-2 mb-4 h-10">
+                        <p className="mb-4 h-10 line-clamp-2 text-sm text-slate-500">
                             {category.description}
                         </p>
 
-                        <div className="flex items-center gap-2 text-sm font-medium text-sky-600 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all">
+                        <div className="flex translate-y-2 items-center gap-2 text-sm font-medium text-sky-600 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
                             <PlayCircle size={18} />
                             ดูวิดีโอทั้งหมด
                         </div>
@@ -108,8 +105,8 @@ export default function VideosPage() {
             </div>
 
             {filteredCategories.length === 0 && (
-                <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                    <Folder size={48} className="mx-auto text-slate-300 mb-4" />
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-20 text-center">
+                    <Folder size={48} className="mx-auto mb-4 text-slate-300" />
                     <h3 className="text-lg font-semibold text-slate-600">ไม่พบหมวดหมู่</h3>
                     <p className="text-slate-500">กรุณาลองค้นหาด้วยคำค้นอื่น</p>
                 </div>

@@ -1,6 +1,6 @@
 import { X, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import type { QuestionType, ExamType, QuestionOption } from '../../types';
+import { useEffect, useState } from 'react';
+import type { QuestionType, ExamType, QuestionOption, Question } from '../../types';
 
 interface AddQuestionModalProps {
     isOpen: boolean;
@@ -13,52 +13,116 @@ interface AddQuestionModalProps {
         correctAnswer?: string;
         timestamp?: string;
         points?: number;
-    }) => void;
+    }) => void | Promise<void>;
+    initialQuestion?: Question | null;
+    title?: string;
+    description?: string;
+    submitLabel?: string;
 }
 
-export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalProps) {
-    // Hardcoded to 'post-lesson' as this modal is only used for Final Exam now
-    const examType: ExamType = 'final-exam';
+const DEFAULT_OPTIONS: QuestionOption[] = [
+    { id: '1', text: '', isCorrect: false },
+    { id: '2', text: '', isCorrect: false },
+];
+
+function normalizeQuestionType(questionType?: QuestionType): QuestionType {
+    if (questionType === 'MULTIPLE_CHOICE') {
+        return 'multiple-choice';
+    }
+
+    if (questionType === 'FREE_TEXT' || questionType === 'SHORT_ANSWER') {
+        return 'free-text';
+    }
+
+    return questionType || 'multiple-choice';
+}
+
+function buildDefaultOptions(question?: Question | null): QuestionOption[] {
+    if (!question?.options || question.options.length === 0) {
+        return DEFAULT_OPTIONS;
+    }
+
+    return question.options.map((option, index) => ({
+        id: option.id || `${index + 1}`,
+        text: option.text,
+        isCorrect: option.isCorrect || option.text === question.correctAnswer,
+    }));
+}
+
+export function AddQuestionModal({
+    isOpen,
+    onClose,
+    onAdd,
+    initialQuestion = null,
+    title = 'เพิ่มคำถาม',
+    description = 'สร้างคำถามสำหรับแบบทดสอบท้ายคอร์ส',
+    submitLabel,
+}: AddQuestionModalProps) {
+    const examType: ExamType = initialQuestion?.examType || 'final-exam';
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [questionType, setQuestionType] = useState<QuestionType>('multiple-choice');
     const [questionText, setQuestionText] = useState('');
     const [points, setPoints] = useState(1);
-    const [options, setOptions] = useState<QuestionOption[]>([
-        { id: '1', text: '', isCorrect: false },
-        { id: '2', text: '', isCorrect: false },
-    ]);
+    const [options, setOptions] = useState<QuestionOption[]>(DEFAULT_OPTIONS);
     const [freeTextAnswer, setFreeTextAnswer] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        setQuestionType(normalizeQuestionType(initialQuestion?.type));
+        setQuestionText(initialQuestion?.question || '');
+        setPoints(initialQuestion?.points || 1);
+        setOptions(buildDefaultOptions(initialQuestion));
+        setFreeTextAnswer(initialQuestion?.correctAnswer || '');
+    }, [initialQuestion, isOpen]);
 
     if (!isOpen) return null;
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!questionText.trim()) return;
-        if (questionType === 'multiple-choice' && options.filter(o => o.text.trim()).length < 2) return;
+        if (questionType === 'multiple-choice' && options.filter((option) => option.text.trim()).length < 2) return;
 
-        const questionData: any = {
+        const questionData: {
+            type: QuestionType;
+            examType: ExamType;
+            question: string;
+            options?: QuestionOption[];
+            correctAnswer?: string;
+            points?: number;
+        } = {
             type: questionType,
-            examType, // Always 'final-exam'
+            examType,
             question: questionText,
             points,
         };
 
         if (questionType === 'multiple-choice') {
-            questionData.options = options.filter(o => o.text.trim());
+            const cleanedOptions = options
+                .filter((option) => option.text.trim())
+                .map((option) => ({ ...option, text: option.text.trim() }));
+
+            questionData.options = cleanedOptions;
+            questionData.correctAnswer = cleanedOptions.find((option) => option.isCorrect)?.text;
         } else {
-            questionData.correctAnswer = freeTextAnswer;
+            questionData.correctAnswer = freeTextAnswer.trim() || undefined;
         }
 
-        onAdd(questionData);
-        handleClose();
+        setIsSubmitting(true);
+        try {
+            await onAdd(questionData);
+            handleClose();
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleClose = () => {
         setQuestionType('multiple-choice');
         setQuestionText('');
         setPoints(1);
-        setOptions([
-            { id: '1', text: '', isCorrect: false },
-            { id: '2', text: '', isCorrect: false },
-        ]);
+        setOptions(DEFAULT_OPTIONS);
         setFreeTextAnswer('');
         onClose();
     };
@@ -69,30 +133,31 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
 
     const removeOption = (id: string) => {
         if (options.length > 2) {
-            setOptions(options.filter(o => o.id !== id));
+            setOptions(options.filter((option) => option.id !== id));
         }
     };
 
     const updateOption = (id: string, text: string) => {
-        setOptions(options.map(o => o.id === id ? { ...o, text } : o));
+        setOptions(options.map((option) => option.id === id ? { ...option, text } : option));
     };
 
     const setCorrectOption = (id: string) => {
-        setOptions(options.map(o => ({ ...o, isCorrect: o.id === id })));
+        setOptions(options.map((option) => ({ ...option, isCorrect: option.id === id })));
     };
 
-    const themeColor = 'violet';
+    const actionLabel = submitLabel || (initialQuestion ? 'บันทึกการแก้ไข' : 'เพิ่มคำถาม');
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slide-in">
-                <div className={`p-6 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-t-2xl flex items-center justify-between sticky top-0 z-10`}>
+                <div className="p-6 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-t-2xl flex items-center justify-between sticky top-0 z-10">
                     <div>
-                        <h3 className="text-2xl font-bold">เพิ่มคำถาม</h3>
-                        <p className="text-violet-100 text-sm mt-1">สร้างคำถามสำหรับแบบทดสอบท้ายคอร์ส</p>
+                        <h3 className="text-2xl font-bold">{title}</h3>
+                        <p className="text-violet-100 text-sm mt-1">{description}</p>
                     </div>
                     <button
                         onClick={handleClose}
+                        disabled={isSubmitting}
                         className="p-2 hover:bg-white/20 rounded-xl transition-all"
                     >
                         <X size={24} />
@@ -100,14 +165,13 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                 </div>
 
                 <div className="p-6 space-y-4">
-                    {/* Question Type */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                             ประเภทคำตอบ <span className="text-red-500">*</span>
                         </label>
                         <select
                             value={questionType}
-                            onChange={(e) => setQuestionType(e.target.value as QuestionType)}
+                            onChange={(event) => setQuestionType(event.target.value as QuestionType)}
                             className="w-full px-4 py-3 border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all bg-white"
                         >
                             <option value="multiple-choice">ตัวเลือก (Multiple Choice)</option>
@@ -115,21 +179,19 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                         </select>
                     </div>
 
-                    {/* Question Text */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                             คำถาม <span className="text-red-500">*</span>
                         </label>
                         <textarea
                             value={questionText}
-                            onChange={(e) => setQuestionText(e.target.value)}
+                            onChange={(event) => setQuestionText(event.target.value)}
                             rows={3}
                             className="w-full px-4 py-3 border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
                             placeholder="กรอกคำถาม"
                         />
                     </div>
 
-                    {/* Options (Multiple Choice only) */}
                     {questionType === 'multiple-choice' && (
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -155,9 +217,8 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                                         <input
                                             type="text"
                                             value={option.text}
-                                            onChange={(e) => updateOption(option.id, e.target.value)}
-                                            className={`flex-1 px-4 py-2 border border-violet-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all ${option.isCorrect ? 'bg-green-50 border-green-300' : ''
-                                                }`}
+                                            onChange={(event) => updateOption(option.id, event.target.value)}
+                                            className={`flex-1 px-4 py-2 border border-violet-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all ${option.isCorrect ? 'bg-green-50 border-green-300' : ''}`}
                                             placeholder={`ตัวเลือกที่ ${index + 1}`}
                                         />
                                         {options.length > 2 && (
@@ -182,7 +243,6 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                         </div>
                     )}
 
-                    {/* Free Text Answer (optional) */}
                     {questionType === 'free-text' && (
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -191,14 +251,13 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                             <input
                                 type="text"
                                 value={freeTextAnswer}
-                                onChange={(e) => setFreeTextAnswer(e.target.value)}
+                                onChange={(event) => setFreeTextAnswer(event.target.value)}
                                 className="w-full px-4 py-3 border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
                                 placeholder="คำตอบที่ถูกต้อง (ถ้ามี)"
                             />
                         </div>
                     )}
 
-                    {/* Points */}
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                             คะแนน
@@ -206,7 +265,7 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                         <input
                             type="number"
                             value={points}
-                            onChange={(e) => setPoints(Number(e.target.value))}
+                            onChange={(event) => setPoints(Number(event.target.value) || 1)}
                             min={1}
                             className="w-full px-4 py-3 border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
                         />
@@ -216,16 +275,17 @@ export function AddQuestionModal({ isOpen, onClose, onAdd }: AddQuestionModalPro
                 <div className="p-6 bg-slate-50 rounded-b-2xl flex items-center justify-end gap-3 sticky bottom-0">
                     <button
                         onClick={handleClose}
+                        disabled={isSubmitting}
                         className="px-5 py-2.5 border border-slate-200 rounded-xl hover:bg-white transition-all font-semibold"
                     >
                         ยกเลิก
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={!questionText.trim()}
+                        disabled={!questionText.trim() || isSubmitting}
                         className="px-5 py-2.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl hover:shadow-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        เพิ่มคำถาม
+                        {isSubmitting ? 'กำลังบันทึก...' : actionLabel}
                     </button>
                 </div>
             </div>

@@ -16,6 +16,8 @@ export enum CourseStatus {
 // QuestionType - supports both legacy and new schema values
 export type QuestionType =
     | 'MULTIPLE_CHOICE'
+    | 'TRUE_FALSE'
+    | 'SHORT_ANSWER'
     | 'FREE_TEXT'
     | 'multiple-choice'
     | 'free-text';
@@ -63,7 +65,9 @@ export interface Course {
     language?: string;
     skillLevel?: 'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
     hasCertificate?: boolean;
+    maxStudents?: number | null;
     enrollmentDeadline?: string | Date;
+    courseEndAt?: string | Date;
     // Schema field
     thumbnailUrl?: string;
     // Backward compatible alias
@@ -81,8 +85,12 @@ export interface Course {
     previewVideo?: Video;
     lessons?: Lesson[];
     exams?: Exam[];
+    exam?: Exam | null;
+    relatedCourses?: Course[];
+    relatedCourseIds?: number[];
     // Frontend display fields (backward compatible)
     enrollmentsCount?: number;
+    enrolledCount?: number;
     enrollments?: number;
     lessonsCount?: number;
     rating?: number;
@@ -111,6 +119,38 @@ export interface Lesson {
     // Relations
     video?: Video;
     videoQuestions?: VideoQuestion[];
+    documents?: LessonDocument[];
+    documentsCount?: number;
+    lessonQuiz?: LessonQuiz | null;
+    hasQuiz?: boolean;
+}
+
+export interface LessonDocument {
+    id: number | string;
+    lessonId: number | string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    fileUrl: string;
+    createdAt?: string;
+}
+
+export interface LessonQuiz {
+    id: number | string;
+    lessonId: number | string;
+    passingScorePercent?: number;
+    maxAttempts?: number | null;
+    questions?: LessonQuizQuestion[];
+}
+
+export interface LessonQuizQuestion {
+    id: number | string;
+    lessonQuizId: number | string;
+    questionText?: string;
+    questionType: QuestionType;
+    options?: QuestionOption[];
+    correctAnswer?: string;
+    scoreWeight?: number;
 }
 
 // ==========================================
@@ -122,9 +162,11 @@ export interface VideoQuestion {
     lessonId: number | string;
     questionText?: string;
     displayAtSeconds?: number;
+    sortOrder?: number;
     questionType: QuestionType;
     options?: QuestionOption[];
     correctAnswer?: string;
+    updatedAt?: string;
 }
 
 export interface QuestionOption {
@@ -177,8 +219,7 @@ export interface Question {
 
 export interface ExamSettings {
     minPassingScore: number;
-    maxAttempts: number | 'unlimited';
-    timeLimit?: number;
+    timeLimit: number | 'unlimited';
 }
 
 
@@ -216,13 +257,15 @@ export interface CreateCourseInput {
     authorName?: string;
     price?: number;
     language?: string;
-    skillLevel?: 'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
     hasCertificate?: boolean;
+    maxStudents?: number;
     enrollmentDeadline?: string;
+    courseEndAt?: string;
     previewVideoId?: number;
     cpeCredits?: number;
     conferenceCode?: string;
     status?: CourseStatus;
+    relatedCourseIds?: number[];
 }
 
 export interface UpdateCourseInput extends Partial<CreateCourseInput> {
@@ -240,9 +283,35 @@ export interface CreateVideoQuestionInput {
     lessonId: number;
     questionText: string;
     displayAtSeconds: number;
+    sortOrder?: number;
     questionType: QuestionType;
     options?: QuestionOption[];
     correctAnswer?: string;
+}
+
+export interface UpdateVideoQuestionInput extends Partial<CreateVideoQuestionInput> {}
+
+export interface CreateLessonDocumentInput {
+    lessonId: number;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    fileUrl: string;
+}
+
+export interface CreateLessonQuizInput {
+    lessonId: number;
+    passingScorePercent?: number;
+    maxAttempts?: number | null;
+    questions?: CreateLessonQuizQuestionInput[];
+}
+
+export interface CreateLessonQuizQuestionInput {
+    questionText: string;
+    questionType: QuestionType;
+    options?: QuestionOption[];
+    correctAnswer?: string;
+    scoreWeight?: number;
 }
 
 export interface CreateExamInput {

@@ -10,6 +10,9 @@ export function PricingSection({ courseType, onCourseTypeChange, price = 0, onPr
         <div className="bg-white rounded-2xl shadow-md border border-sky-100">
             <div className="p-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 rounded-t-2xl">
                 <h2 className="text-xl font-bold text-slate-800">ราคาและการเข้าถึง</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                    กำหนดว่าคอร์สนี้เป็นคอร์สฟรีหรือมีค่าใช้จ่าย ข้อมูลนี้จะใช้แสดงบนการ์ดคอร์สและหน้า Course Details
+                </p>
             </div>
             <div className="p-6 space-y-4">
                 <div>
@@ -28,6 +31,9 @@ export function PricingSection({ courseType, onCourseTypeChange, price = 0, onPr
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                             ราคา (บาท) <span className="text-red-500">*</span>
                         </label>
+                        <p className="mb-2 text-xs text-slate-500">
+                            ระบุราคาที่ผู้เรียนต้องชำระก่อนเข้าเรียน หากต้องการให้เข้าเรียนได้ทันทีให้เลือกคอร์สฟรี
+                        </p>
                         <input
                             type="number"
                             min={0}

@@ -1,11 +1,11 @@
 'use client';
 
-import { use } from 'react';
+import { use, useEffect, useState } from 'react';
 import { ArrowLeft, CreditCard, User, BookOpen, Calendar, CheckCircle, XCircle, Clock, Receipt, FileText, Copy, Download } from 'lucide-react';
 import Link from 'next/link';
+import { paymentService } from '@/features/payments/services/paymentService';
 
-// Mock transaction details
-const mockTransactions: Record<string, {
+interface TransactionDetail {
     id: string;
     user: { name: string; email: string; phone: string };
     course: { title: string; category: string; instructor: string };
@@ -22,50 +22,7 @@ const mockTransactions: Record<string, {
         bankName?: string;
         promptpayRef?: string;
     };
-}> = {
-    'TXN001': {
-        id: 'TXN001',
-        user: { name: 'สมชาย ใจดี', email: 'somchai@example.com', phone: '081-234-5678' },
-        course: { title: 'การดูแลผู้ป่วยโรคเรื้อรัง', category: 'วิทยาลัยเภสัชบำบัด', instructor: 'ผศ.ดร.สมหญิง วิชาการ' },
-        amount: 500,
-        originalPrice: 600,
-        discount: 100,
-        couponCode: 'WELCOME50',
-        method: 'PromptPay',
-        status: 'completed',
-        date: '22 ธ.ค. 2024 10:30:45',
-        transactionRef: 'PP2024122210304512345',
-        paymentDetails: { promptpayRef: '1234567890123', bankName: 'กสิกรไทย' },
-    },
-    'TXN002': {
-        id: 'TXN002',
-        user: { name: 'สมหญิง รักเรียน', email: 'somying@example.com', phone: '082-345-6789' },
-        course: { title: 'เภสัชกรรมคลินิกขั้นสูง', category: 'วิทยาลัยเภสัชบำบัด', instructor: 'รศ.ดร.วิชัย เก่งกาจ' },
-        amount: 800,
-        originalPrice: 800,
-        discount: 0,
-        couponCode: null,
-        method: 'Credit Card',
-        status: 'completed',
-        date: '22 ธ.ค. 2024 09:15:22',
-        transactionRef: 'CC2024122209152298765',
-        paymentDetails: { cardLast4: '4532', bankName: 'Visa' },
-    },
-    'TXN003': {
-        id: 'TXN003',
-        user: { name: 'วิภา มานะ', email: 'wipa@example.com', phone: '083-456-7890' },
-        course: { title: 'กฎหมายเภสัชกรรม 2024', category: 'วิทยาลัยคุ้มครองผู้บริโภคด้านยาฯ', instructor: 'อ.นิติ กฎหมาย' },
-        amount: 400,
-        originalPrice: 500,
-        discount: 100,
-        couponCode: 'PHARMACY20',
-        method: 'PromptPay',
-        status: 'pending',
-        date: '22 ธ.ค. 2024 08:45:11',
-        transactionRef: 'PP2024122208451187654',
-        paymentDetails: { promptpayRef: '9876543210987' },
-    },
-};
+}
 
 const getStatusBadge = (status: string) => {
     switch (status) {
@@ -97,12 +54,49 @@ const getStatusBadge = (status: string) => {
 
 export default function TransactionDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const txn = mockTransactions[id] || mockTransactions['TXN001'];
+    const [txn, setTxn] = useState<TransactionDetail | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const loadTransaction = async () => {
+            try {
+                setIsLoading(true);
+                const data = await paymentService.getTransactionById(id) as unknown as TransactionDetail;
+                setTxn(data);
+            } catch (err) {
+                console.error('Failed to load transaction:', err);
+                setError('ไม่สามารถโหลดข้อมูลธุรกรรมได้');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadTransaction();
+    }, [id]);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
         alert('คัดลอกแล้ว!');
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
+
+    if (error || !txn) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 gap-4">
+                <p className="text-red-500">{error || 'ไม่พบข้อมูลธุรกรรม'}</p>
+                <Link href="/payments/transactions" className="text-blue-600 hover:underline">
+                    กลับไปหน้ารายการธุรกรรม
+                </Link>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

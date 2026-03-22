@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/services/api/client';
+import { ApiError, apiClient } from '@/services/api/client';
 import PasswordConfirmModal from '@/components/modals/PasswordConfirmModal';
 
 export default function AddAdminPage() {
@@ -19,6 +19,7 @@ export default function AddAdminPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -47,16 +48,17 @@ export default function AddAdminPage() {
         const isOfficer = role === 'officer' || role === 'system_admin';
 
         if (!email || !password || (isOfficer && !department)) {
-            alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+            setFormError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
 
         if (password.length < 8) {
-            alert('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+            setFormError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
             return;
         }
 
         // Show password confirmation modal instead of creating directly
+        setFormError(null);
         setPasswordError(null);
         setShowPasswordModal(true);
     };
@@ -77,16 +79,18 @@ export default function AddAdminPage() {
             await apiClient.post('/admin/users', data);
             
             setShowPasswordModal(false);
-            alert('สร้างผู้ดูแลระบบสำเร็จ');
-            router.push('/users/admins');
+            router.push('/users/admins?created=1');
         } catch (error: unknown) {
             console.error('Failed to create admin:', error);
-            const errorMessage = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างผู้ดูแลระบบ';
-            if (errorMessage.includes('รหัสผ่าน')) {
-                setPasswordError(errorMessage);
+            const apiError = error instanceof ApiError ? error : null;
+            if (apiError?.code === 'INVALID_CONFIRM_PASSWORD') {
+                setPasswordError(apiError.message);
+            } else if (apiError?.code === 'ADMIN_EMAIL_EXISTS') {
+                setShowPasswordModal(false);
+                setFormError(apiError.message);
             } else {
                 setShowPasswordModal(false);
-                alert(errorMessage);
+                setFormError(apiError?.message || 'เกิดข้อผิดพลาดในการสร้างผู้ดูแลระบบ');
             }
         } finally {
             setIsCreating(false);
@@ -113,6 +117,11 @@ export default function AddAdminPage() {
                 </div>
                 
                 <div className="p-6 space-y-6">
+                    {formError && (
+                        <div className="px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-red-700">
+                            {formError}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">

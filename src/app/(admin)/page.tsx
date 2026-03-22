@@ -5,24 +5,11 @@ import { StatCard, getStatIcon, getStatColor } from '@/features/dashboard/compon
 import { formatCurrency, formatNumber } from '@/utils/format';
 import {
   Users, BookOpen, CreditCard, Award, TrendingUp, ArrowRight, Calendar,
-  Clock, CheckCircle, AlertTriangle, BarChart3, Plus, Eye
+  AlertTriangle, BarChart3, Plus, CheckCircle, XCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
-
-// Mock weekly revenue data for chart
-const weeklyRevenue = [
-  { day: 'จ.', amount: 12500 },
-  { day: 'อ.', amount: 18200 },
-  { day: 'พ.', amount: 15800 },
-  { day: 'พฤ.', amount: 22100 },
-  { day: 'ศ.', amount: 28500 },
-  { day: 'ส.', amount: 14200 },
-  { day: 'อา.', amount: 8900 },
-];
-
-const maxAmount = Math.max(...weeklyRevenue.map(d => d.amount));
 
 export default function DashboardPage() {
   const { data, isLoading, error } = useDashboard();
@@ -56,6 +43,19 @@ export default function DashboardPage() {
   }
 
   if (!data) return null;
+
+  const maxAmount = Math.max(...data.weeklyRevenue.map((entry) => entry.amount), 1);
+  const weeklyRevenueTotal = data.weeklyRevenue.reduce((sum, entry) => sum + entry.amount, 0);
+  const getStatusClasses = (status: 'healthy' | 'degraded') => (
+    status === 'healthy'
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-amber-100 text-amber-700'
+  );
+  const getStatusIcon = (status: 'healthy' | 'degraded') => (
+    status === 'healthy'
+      ? <CheckCircle size={14} className="text-emerald-500" />
+      : <XCircle size={14} className="text-amber-500" />
+  );
 
   const stats = [
     { type: 'users', title: 'ผู้ใช้ทั้งหมด', value: formatNumber(data.stats.totalUsers), change: data.stats.usersChange },
@@ -116,22 +116,22 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="text-left sm:text-right">
-                <p className="text-2xl font-bold text-blue-600">฿{(weeklyRevenue.reduce((a, b) => a + b.amount, 0) / 1000).toFixed(1)}k</p>
+                <p className="text-2xl font-bold text-blue-600">฿{(weeklyRevenueTotal / 1000).toFixed(1)}k</p>
                 <p className="text-sm text-emerald-600 flex items-center gap-1 sm:justify-end">
                   <TrendingUp size={14} />
-                  +15% จากสัปดาห์ก่อน
+                  {data.stats.revenueChange >= 0 ? '+' : ''}{data.stats.revenueChange}% เทียบเดือนก่อน
                 </p>
               </div>
             </div>
             <div className="p-4 md:p-6">
               <div className="flex items-end justify-between gap-2 md:gap-3 h-32 md:h-40">
-                {weeklyRevenue.map((day, idx) => (
+                {data.weeklyRevenue.map((day, idx) => (
                   <div key={idx} className="flex-1 flex flex-col items-center gap-2">
                     <div
                       className="w-full bg-gradient-to-t from-blue-500 to-indigo-400 rounded-t-lg transition-all hover:from-blue-600 hover:to-indigo-500"
                       style={{ height: `${(day.amount / maxAmount) * 100}%` }}
                     />
-                    <span className="text-xs font-medium text-slate-500">{day.day}</span>
+                    <span className="text-xs font-medium text-slate-500">{day.label}</span>
                   </div>
                 ))}
               </div>
@@ -190,13 +190,9 @@ export default function DashboardPage() {
                 <Users size={20} />
                 <span className="font-medium">จัดการเภสัชกร</span>
               </Link>
-              <Link href="/payments/transactions" className="flex items-center gap-3 p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all touch-target">
-                <CreditCard size={20} />
-                <span className="font-medium">ดูรายการธุรกรรม</span>
-              </Link>
-              <Link href="/payments/coupons" className="flex items-center gap-3 p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all touch-target">
-                <Award size={20} />
-                <span className="font-medium">จัดการคูปอง</span>
+              <Link href="/users" className="flex items-center gap-3 p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all touch-target">
+                <Users size={20} />
+                <span className="font-medium">จัดการผู้ใช้งาน</span>
               </Link>
             </div>
           </div>
@@ -244,15 +240,24 @@ export default function DashboardPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2">
                 <span className="text-slate-500 text-sm">API Server</span>
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">ปกติ</span>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusClasses(data.systemStatus.api.status)}`}>
+                  {getStatusIcon(data.systemStatus.api.status)}
+                  {data.systemStatus.api.label}
+                </span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-slate-500 text-sm">Database</span>
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">ปกติ</span>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusClasses(data.systemStatus.database.status)}`}>
+                  {getStatusIcon(data.systemStatus.database.status)}
+                  {data.systemStatus.database.label}
+                </span>
               </div>
               <div className="flex items-center justify-between py-2">
-                <span className="text-slate-500 text-sm">Storage</span>
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">78% ใช้งาน</span>
+                <span className="text-slate-500 text-sm">Vimeo / Video</span>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusClasses(data.systemStatus.videoProvider.status)}`}>
+                  {getStatusIcon(data.systemStatus.videoProvider.status)}
+                  {data.systemStatus.videoProvider.label}
+                </span>
               </div>
             </div>
           </div>

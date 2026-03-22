@@ -4,50 +4,13 @@ import { useState, useEffect, use } from 'react';
 import { ArrowLeft, Save, Tag, Percent, Calendar, Gift, Users, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-// Mock data
-const mockCoupons: Record<string, {
-    code: string;
-    description: string;
-    discountType: 'percent' | 'fixed';
-    discountValue: number;
-    usageLimit: number;
-    minPurchase: number;
-    maxDiscount: number;
-    expiryDate: string;
-    applicableTo: 'all' | 'specific';
-    userLimit: number;
-}> = {
-    '1': {
-        code: 'NEWYEAR2025',
-        description: 'โปรโมชั่นต้อนรับปีใหม่ 2025',
-        discountType: 'percent',
-        discountValue: 30,
-        usageLimit: 500,
-        minPurchase: 200,
-        maxDiscount: 300,
-        expiryDate: '2024-12-31',
-        applicableTo: 'all',
-        userLimit: 1,
-    },
-    '2': {
-        code: 'WELCOME50',
-        description: 'ส่วนลดสำหรับสมาชิกใหม่',
-        discountType: 'fixed',
-        discountValue: 50,
-        usageLimit: 1000,
-        minPurchase: 100,
-        maxDiscount: 0,
-        expiryDate: '2025-01-31',
-        applicableTo: 'all',
-        userLimit: 1,
-    },
-};
+import { paymentService } from '@/features/payments/services/paymentService';
 
 export default function EditCouponPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [code, setCode] = useState('');
     const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
     const [discountValue, setDiscountValue] = useState('');
@@ -60,45 +23,64 @@ export default function EditCouponPage({ params }: { params: Promise<{ id: strin
     const [userLimit, setUserLimit] = useState('1');
 
     useEffect(() => {
-        // Load coupon data
-        const coupon = mockCoupons[id];
-        if (coupon) {
-            setCode(coupon.code);
-            setDescription(coupon.description);
-            setDiscountType(coupon.discountType);
-            setDiscountValue(String(coupon.discountValue));
-            setUsageLimit(String(coupon.usageLimit));
-            setMinPurchase(String(coupon.minPurchase));
-            setMaxDiscount(String(coupon.maxDiscount));
-            setExpiryDate(coupon.expiryDate);
-            setApplicableTo(coupon.applicableTo);
-            setUserLimit(String(coupon.userLimit));
-        }
-        setLoading(false);
+        const loadCoupon = async () => {
+            try {
+                setLoading(true);
+                const coupon = await paymentService.getCouponById(Number(id)) as any;
+                if (coupon) {
+                    setCode(coupon.code ?? '');
+                    setDescription(coupon.description ?? '');
+                    setDiscountType(coupon.discountType ?? coupon.type ?? 'percent');
+                    setDiscountValue(String(coupon.discountValue ?? coupon.discount ?? ''));
+                    setUsageLimit(String(coupon.usageLimit ?? coupon.limit ?? ''));
+                    setMinPurchase(String(coupon.minPurchase ?? coupon.minOrderAmount ?? '0'));
+                    setMaxDiscount(String(coupon.maxDiscount ?? '0'));
+                    setExpiryDate(coupon.expiryDate ?? coupon.endDate ?? coupon.expires ?? '');
+                    setApplicableTo(coupon.applicableTo ?? 'all');
+                    setUserLimit(String(coupon.userLimit ?? coupon.perUserLimit ?? '1'));
+                }
+            } catch (err) {
+                console.error('Failed to load coupon:', err);
+                setError('ไม่สามารถโหลดข้อมูลคูปองได้');
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadCoupon();
     }, [id]);
 
-    const handleSave = () => {
-        const couponData = {
-            code,
-            discountType,
-            discountValue: Number(discountValue),
-            usageLimit: Number(usageLimit),
-            minPurchase: Number(minPurchase),
-            maxDiscount: discountType === 'percent' ? Number(maxDiscount) : null,
-            expiryDate,
-            description,
-            applicableTo,
-            userLimit: Number(userLimit),
-        };
-        console.log('Update coupon:', couponData);
-        alert('อัปเดตคูปองสำเร็จ!');
-        router.push('/payments/coupons');
+    const handleSave = async () => {
+        try {
+            await paymentService.updateCoupon(Number(id), {
+                code,
+                type: discountType,
+                discount: Number(discountValue),
+                limit: Number(usageLimit),
+                expires: expiryDate,
+            } as any);
+            alert('อัปเดตคูปองสำเร็จ!');
+            router.push('/payments/coupons');
+        } catch (err) {
+            console.error('Failed to update coupon:', err);
+            alert('ไม่สามารถอัปเดตคูปองได้');
+        }
     };
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 gap-4">
+                <p className="text-red-500">{error}</p>
+                <Link href="/payments/coupons" className="text-blue-600 hover:underline">
+                    กลับไปหน้ารายการคูปอง
+                </Link>
             </div>
         );
     }

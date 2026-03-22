@@ -11,7 +11,6 @@ export interface User {
 export interface Pharmacist extends User {
     license: string;
     cpeCredits: number;
-    verificationStatus: 'verified' | 'pending' | 'rejected';
 }
 
 export interface UserStats {
@@ -21,7 +20,6 @@ export interface UserStats {
 }
 
 export interface PharmacistStats extends UserStats {
-    verified: number;
     totalCpeCredits: number;
     averageCpeCredits: number;
 }
@@ -34,4 +32,61 @@ export interface UsersData {
 export interface PharmacistsData {
     pharmacists: Pharmacist[];
     stats: PharmacistStats;
+}
+
+export interface UserOverviewProfile {
+    id: string;
+    fullName: string;
+    email: string;
+    role: 'member' | 'pharmacist' | 'admin';
+    professionalLicenseNumber: string | null;
+    createdAt: Date;
+    accountStatus: 'active' | 'inactive';
+    failedAttempts: number;
+}
+
+export interface UserOverviewSummary {
+    totalCourses: number;
+    completedCourses: number;
+    inProgressCourses: number;
+    averageWatchPercent: number;
+    totalSpent: number;
+    earnedCpeCredits: number;
+}
+
+export interface UserOverviewEnrollment {
+    id: string;
+    courseId: string;
+    courseTitle: string;
+    watchPercent: number;
+    completionPercent: number;
+    isCompleted: boolean;
+    enrolledAt: Date;
+    cpeCredits: number;
+    certificateCode: string | null;
+}
+
+export interface UserOverviewTransaction {
+    id: string;
+    amount: number;
+    status: string;
+    createdAt: Date;
+    courseTitles: string[];
+}
+
+export interface UserOverviewCertificate {
+    id: string;
+    certificateCode: string;
+    issuedAt: Date;
+    courseId: string;
+    courseTitle: string;
+    cpeCredits: number;
+}
+
+export interface UserOverviewResponse {
+    profile: UserOverviewProfile;
+    summary: UserOverviewSummary;
+    enrollments: UserOverviewEnrollment[];
+    transactions: UserOverviewTransaction[];
+    certificates: UserOverviewCertificate[];
 }

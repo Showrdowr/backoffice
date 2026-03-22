@@ -1,104 +1,163 @@
 import { apiClient } from '@/services/api/client';
-import type { User, Pharmacist, UserStats, PharmacistStats, UsersData, PharmacistsData } from '../types';
+import { parseDbDate } from '@/utils/date';
+import type {
+    Pharmacist,
+    PharmacistStats,
+    PharmacistsData,
+    User,
+    UserOverviewResponse,
+    UserStats,
+    UsersData,
+} from '../types';
 
 interface RawUser {
     id: number;
-    fullName: string;
+    fullName: string | null;
     email: string;
     failedAttempts: number;
     createdAt: string;
     courseCount: number;
+    professionalLicenseNumber?: string | null;
+    earnedCpeCredits?: number | null;
 }
 
-interface RawPharmacist extends RawUser {
-    professionalLicenseNumber: string;
+interface RawUsersResponse<TUser, TStats> {
+    users: TUser[];
+    stats: TStats;
+}
+
+interface RawUserProfile {
+    id: string;
+    fullName: string;
+    email: string;
+    role: 'member' | 'pharmacist' | 'admin';
+    professionalLicenseNumber: string | null;
+    createdAt: string;
+    accountStatus: 'active' | 'inactive';
+    failedAttempts: number;
+}
+
+interface RawUserOverviewResponse {
+    profile: RawUserProfile;
+    summary: UserOverviewResponse['summary'];
+    enrollments: Array<{
+        id: string;
+        courseId: string;
+        courseTitle: string;
+        watchPercent: number;
+        completionPercent: number;
+        isCompleted: boolean;
+        enrolledAt: string;
+        cpeCredits: number;
+        certificateCode: string | null;
+    }>;
+    transactions: Array<{
+        id: string;
+        amount: number;
+        status: string;
+        createdAt: string;
+        courseTitles: string[];
+    }>;
+    certificates: Array<{
+        id: string;
+        certificateCode: string;
+        issuedAt: string;
+        courseId: string;
+        courseTitle: string;
+        cpeCredits: number;
+    }>;
+}
+
+interface RawEditableUser {
+    id: number;
+    fullName: string | null;
+    email: string;
+    professionalLicenseNumber?: string | null;
+}
+
+function mapBaseUser(user: RawUser): User {
+    return {
+        id: user.id.toString(),
+        name: user.fullName || 'ไม่ระบุชื่อ',
+        email: user.email,
+        status: user.failedAttempts < 5 ? 'active' : 'inactive',
+        joined: parseDbDate(user.createdAt),
+        courses: user.courseCount || 0,
+    };
+}
+
+function mapOverview(data: RawUserOverviewResponse): UserOverviewResponse {
+    return {
+        profile: {
+            ...data.profile,
+            createdAt: parseDbDate(data.profile.createdAt),
+        },
+        summary: data.summary,
+        enrollments: data.enrollments.map((enrollment) => ({
+            ...enrollment,
+            enrolledAt: parseDbDate(enrollment.enrolledAt),
+        })),
+        transactions: data.transactions.map((transaction) => ({
+            ...transaction,
+            createdAt: parseDbDate(transaction.createdAt),
+        })),
+        certificates: data.certificates.map((certificate) => ({
+            ...certificate,
+            issuedAt: parseDbDate(certificate.issuedAt),
+        })),
+    };
 }
 
 export const userService = {
-    /**
-     * Fetch all general users
-     */
     async getUsers(page: number = 1, limit: number = 20, search?: string, status?: 'active' | 'inactive'): Promise<UsersData> {
-        try {
-            const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-            const statusParam = status ? `&status=${status}` : '';
-            const response = await apiClient.get<{ users: RawUser[], stats: UserStats }>(`/users?role=member&page=${page}&limit=${limit}${searchParam}${statusParam}`);
-            
-            const users: User[] = response.data.users.map(u => ({
-                id: u.id.toString(),
-                name: u.fullName || 'ไม่ระบุชื่อ',
-                email: u.email,
-                status: u.failedAttempts < 5 ? 'active' : 'inactive',
-                joined: new Date(u.createdAt),
-                courses: u.courseCount || 0,
-            }));
+        const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+        const statusParam = status ? `&status=${status}` : '';
+        const response = await apiClient.get<{ data: RawUsersResponse<RawUser, UserStats> } | RawUsersResponse<RawUser, UserStats>>(
+            `/users?role=member&page=${page}&limit=${limit}${searchParam}${statusParam}`
+        );
+        const payload = 'users' in response.data ? response.data : response.data.data;
 
-            return { users, stats: response.data.stats };
-        } catch (error) {
-            console.error('Failed to fetch users:', error);
-            throw error;
-        }
+        return {
+            users: payload.users.map(mapBaseUser),
+            stats: payload.stats,
+        };
     },
 
-    /**
-     * Fetch all pharmacists
-     */
     async getPharmacists(page: number = 1, limit: number = 20, search?: string, status?: 'active' | 'inactive'): Promise<PharmacistsData> {
-        try {
-            const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-            const statusParam = status ? `&status=${status}` : '';
-            const response = await apiClient.get<{ users: RawPharmacist[], stats: PharmacistStats }>(`/users?role=pharmacist&page=${page}&limit=${limit}${searchParam}${statusParam}`);
-            
-            const pharmacists: Pharmacist[] = response.data.users.map(u => ({
-                id: u.id.toString(),
-                name: u.fullName || 'ไม่ระบุชื่อ',
-                email: u.email,
-                license: u.professionalLicenseNumber || '-',
-                status: u.failedAttempts < 5 ? 'active' : 'inactive',
-                verificationStatus: 'verified', // Placeholder as requested, no CPE logic yet
-                cpeCredits: 0, 
-                courses: u.courseCount || 0,
-                joined: new Date(u.createdAt),
-            }));
+        const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+        const statusParam = status ? `&status=${status}` : '';
+        const response = await apiClient.get<{ data: RawUsersResponse<RawUser, PharmacistStats> } | RawUsersResponse<RawUser, PharmacistStats>>(
+            `/users?role=pharmacist&page=${page}&limit=${limit}${searchParam}${statusParam}`
+        );
+        const payload = 'users' in response.data ? response.data : response.data.data;
 
-            const stats: PharmacistStats = {
-                total: response.data.stats.total,
-                active: response.data.stats.active,
-                inactive: response.data.stats.inactive,
-                verified: response.data.stats.active, // Placeholder
-                totalCpeCredits: 0,
-                averageCpeCredits: 0,
-            };
-
-            return { pharmacists, stats };
-        } catch (error) {
-            console.error('Failed to fetch pharmacists:', error);
-            throw error;
-        }
+        return {
+            pharmacists: payload.users.map((user): Pharmacist => ({
+                ...mapBaseUser(user),
+                license: user.professionalLicenseNumber || '-',
+                cpeCredits: Number(user.earnedCpeCredits ?? 0),
+            })),
+            stats: payload.stats,
+        };
     },
 
-    /**
-     * Delete a user
-     */
+    async getUserOverview(id: string): Promise<UserOverviewResponse> {
+        const response = await apiClient.get<RawUserOverviewResponse>(`/users/${id}/overview`);
+        const payload = 'data' in response.data ? response.data.data : response.data;
+        return mapOverview(payload as RawUserOverviewResponse);
+    },
+
+    async getUserById(id: string): Promise<RawEditableUser> {
+        const response = await apiClient.get<RawEditableUser>(`/users/${id}`);
+        return response.data;
+    },
+
+    async updateUser(id: string, data: { fullName: string; email: string; professionalLicenseNumber?: string | null }) {
+        const response = await apiClient.put<RawEditableUser>(`/users/${id}`, data);
+        return response.data;
+    },
+
     async deleteUser(id: string): Promise<void> {
-        try {
-            await apiClient.delete(`/users/${id}`);
-        } catch (error) {
-            console.error('Failed to delete user:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Send email to user
-     */
-    async sendEmail(id: string, message: string): Promise<void> {
-        try {
-            // In production: await apiClient.post(`/users/${id}/email`, { message });
-            console.log('Send email to:', id, message);
-        } catch (error) {
-            console.error('Failed to send email:', error);
-            throw error;
-        }
+        await apiClient.delete(`/users/${id}`);
     },
 };

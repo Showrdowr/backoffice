@@ -49,27 +49,33 @@ export function UsersTable({ users, onView, onEmail, onDelete }: UsersTableProps
                             <td className="px-4 md:px-6 py-4 text-slate-600 font-medium hidden sm:table-cell text-sm">{user.courses} คอร์ส</td>
                             <td className="px-4 md:px-6 py-4">
                                 <div className="flex items-center justify-end gap-1 md:gap-2">
-                                    <button
-                                        onClick={() => onView?.(user.id)}
-                                        className="p-2 md:p-2.5 hover:bg-sky-100 rounded-xl transition-all group/btn touch-target"
-                                        title="ดูรายละเอียด"
-                                    >
-                                        <Eye size={16} className="text-slate-500 group-hover/btn:text-sky-600" />
-                                    </button>
-                                    <button
-                                        onClick={() => onEmail?.(user.id)}
-                                        className="p-2 md:p-2.5 hover:bg-blue-100 rounded-xl transition-all group/btn touch-target hidden sm:block"
-                                        title="ส่งอีเมล"
-                                    >
-                                        <Mail size={16} className="text-slate-500 group-hover/btn:text-blue-600" />
-                                    </button>
-                                    <button
-                                        onClick={() => onDelete?.(user.id)}
-                                        className="p-2 md:p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn touch-target hidden md:block"
-                                        title="ลบ"
-                                    >
-                                        <Trash2 size={16} className="text-slate-500 group-hover/btn:text-red-600" />
-                                    </button>
+                                    {onView && (
+                                        <button
+                                            onClick={() => onView(user.id)}
+                                            className="p-2 md:p-2.5 hover:bg-sky-100 rounded-xl transition-all group/btn touch-target"
+                                            title="ดูรายละเอียด"
+                                        >
+                                            <Eye size={16} className="text-slate-500 group-hover/btn:text-sky-600" />
+                                        </button>
+                                    )}
+                                    {onEmail && (
+                                        <button
+                                            onClick={() => onEmail(user.id)}
+                                            className="p-2 md:p-2.5 hover:bg-blue-100 rounded-xl transition-all group/btn touch-target hidden sm:block"
+                                            title="ส่งอีเมล"
+                                        >
+                                            <Mail size={16} className="text-slate-500 group-hover/btn:text-blue-600" />
+                                        </button>
+                                    )}
+                                    {onDelete && (
+                                        <button
+                                            onClick={() => onDelete(user.id)}
+                                            className="p-2 md:p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn touch-target hidden md:block"
+                                            title="ลบ"
+                                        >
+                                            <Trash2 size={16} className="text-slate-500 group-hover/btn:text-red-600" />
+                                        </button>
+                                    )}
                                 </div>
                             </td>
                         </tr>

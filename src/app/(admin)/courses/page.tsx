@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCourses, useCategories } from '@/features/courses/hooks';
 import { CourseStatsCards } from '@/features/courses/components/CourseStatsCards';
@@ -10,6 +10,8 @@ import { LoadingSpinner, ErrorMessage } from '@/components/ui';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 
+const PAGE_SIZE = 10;
+
 export default function CoursesPage() {
     const router = useRouter();
     const { courses, stats, isLoading, error, deleteCourse } = useCourses();
@@ -18,6 +20,7 @@ export default function CoursesPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('ALL');
     const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('ALL');
+    const [page, setPage] = useState(1);
 
     const categoryOptions = useMemo(() => {
         const fromApi = categories.map((category) => ({
@@ -71,6 +74,27 @@ export default function CoursesPage() {
         });
     }, [courses, searchQuery, selectedCategory, selectedStatus]);
 
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, selectedCategory, selectedStatus]);
+
+    const totalItems = filteredCourses.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+    useEffect(() => {
+        if (page > totalPages) {
+            setPage(totalPages);
+        }
+    }, [page, totalPages]);
+
+    const paginatedCourses = useMemo(() => {
+        const startIndex = (page - 1) * PAGE_SIZE;
+        return filteredCourses.slice(startIndex, startIndex + PAGE_SIZE);
+    }, [filteredCourses, page]);
+
+    const startItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+    const endItem = totalItems === 0 ? 0 : Math.min(page * PAGE_SIZE, totalItems);
+
     if (isLoading) {
         return <LoadingSpinner message="กำลังโหลดข้อมูลคอร์ส..." />;
     }
@@ -116,7 +140,7 @@ export default function CoursesPage() {
                     categories={categoryOptions}
                 />
                 <CoursesTable
-                    courses={filteredCourses}
+                    courses={paginatedCourses}
                     onView={(id) => router.push(`/courses/${id}`)}
                     onEdit={(id) => router.push(`/courses/${id}/edit`)}
                     onDelete={async (id) => {
@@ -126,7 +150,7 @@ export default function CoursesPage() {
                                 alert('ลบคอร์สสำเร็จ');
                             } catch (err) {
                                 console.error('Failed to delete course:', err);
-                                alert('เกิดข้อผิดพลาดในการลบคอร์ส');
+                                alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบคอร์ส');
                             }
                         }
                     }}
@@ -135,16 +159,26 @@ export default function CoursesPage() {
                 {/* Pagination */}
                 <div className="p-6 border-t border-violet-100 bg-slate-50 flex items-center justify-between">
                     <p className="text-sm text-slate-500 font-medium">
-                        {filteredCourses.length > 0
-                            ? `แสดง 1-${filteredCourses.length} จาก ${courses.length} รายการ`
-                            : `ไม่พบข้อมูล จาก ${courses.length} รายการ`}
+                        {totalItems > 0
+                            ? `แสดง ${startItem}-${endItem} จากทั้งหมด ${totalItems} รายการ`
+                            : `ไม่พบข้อมูล จากทั้งหมด ${courses.length} รายการ`}
                     </p>
                     <div className="flex items-center gap-2">
-                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all" disabled>
+                        <button
+                            className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all"
+                            disabled={page === 1}
+                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                        >
                             ก่อนหน้า
                         </button>
-                        <button className="px-4 py-2 bg-violet-500 text-white rounded-xl text-sm font-semibold shadow-sm">1</button>
-                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all" disabled>
+                        <button className="px-4 py-2 bg-violet-500 text-white rounded-xl text-sm font-semibold shadow-sm">
+                            {page}
+                        </button>
+                        <button
+                            className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all"
+                            disabled={page >= totalPages}
+                            onClick={() => setPage((prev) => prev + 1)}
+                        >
                             ถัดไป
                         </button>
                     </div>

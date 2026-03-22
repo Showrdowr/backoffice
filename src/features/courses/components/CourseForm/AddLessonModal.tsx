@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, FileText, Trash2, Upload, AlertCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, FileText, Trash2, Upload, AlertCircle, Eye } from 'lucide-react';
 import type { Video as VideoType } from '@/features/videos/types';
 import type { LessonDocument } from '../../types';
 import type { VideoQuestion } from '../../types';
@@ -33,9 +33,29 @@ function formatDuration(seconds: number | null | undefined): string {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function isPdfDocument(fileName: string, mimeType?: string | null) {
+    return String(mimeType || '').toLowerCase().includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
+}
+
 export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, availableVideos, onVideoUpload }: AddLessonModalProps) {
     const [modalError, setModalError] = useState<string | null>(null);
     const [isVideoPickerBusy, setIsVideoPickerBusy] = useState(false);
+    const [previewDocumentId, setPreviewDocumentId] = useState<string | null>(null);
+    const previewDocument = useMemo(
+        () => lessonData.documents.find((doc) => String(doc.id) === previewDocumentId) || null,
+        [lessonData.documents, previewDocumentId]
+    );
+
+    useEffect(() => {
+        if (lessonData.documents.length === 0) {
+            setPreviewDocumentId(null);
+            return;
+        }
+
+        if (!previewDocumentId || !lessonData.documents.some((doc) => String(doc.id) === previewDocumentId)) {
+            setPreviewDocumentId(String(lessonData.documents[0].id));
+        }
+    }, [lessonData.documents, previewDocumentId]);
 
     if (!isOpen) return null;
 
@@ -81,15 +101,22 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                 ...lessonData,
                 documents: [...lessonData.documents, ...nextDocuments],
             });
+            if (nextDocuments.length > 0) {
+                setPreviewDocumentId(String(nextDocuments[0].id));
+            }
         }
         event.target.value = '';
     };
 
     const removeDocument = (id: string) => {
+        const remainingDocuments = lessonData.documents.filter((doc) => String(doc.id) !== id);
         onChange({
             ...lessonData,
-            documents: lessonData.documents.filter((doc) => String(doc.id) !== id),
+            documents: remainingDocuments,
         });
+        if (previewDocumentId === id) {
+            setPreviewDocumentId(remainingDocuments[0] ? String(remainingDocuments[0].id) : null);
+        }
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -200,6 +227,14 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                             <p className="text-xs text-slate-500">{doc.mimeType} • {formatFileSize(doc.sizeBytes)}</p>
                                         </div>
                                         <button
+                                            onClick={() => setPreviewDocumentId(String(doc.id))}
+                                            className="rounded-lg p-2 transition-all hover:bg-sky-50"
+                                            title="ดูตัวอย่างเอกสาร"
+                                            disabled={isVideoPickerBusy}
+                                        >
+                                            <Eye size={16} className="text-sky-500" />
+                                        </button>
+                                        <button
                                             onClick={() => removeDocument(String(doc.id))}
                                             className="rounded-lg p-2 transition-all hover:bg-red-50"
                                             disabled={isVideoPickerBusy}
@@ -208,6 +243,35 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                         </button>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {previewDocument && (
+                            <div className="mb-4 overflow-hidden rounded-xl border border-sky-100 bg-white">
+                                <div className="flex items-center justify-between border-b border-sky-100 bg-sky-50 px-4 py-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-800">ตัวอย่างเอกสาร</p>
+                                        <p className="text-xs text-slate-500">{previewDocument.fileName}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setPreviewDocumentId(null)}
+                                        className="rounded-lg p-2 transition-all hover:bg-white"
+                                        title="ปิดตัวอย่าง"
+                                    >
+                                        <X size={16} className="text-slate-500" />
+                                    </button>
+                                </div>
+                                {isPdfDocument(previewDocument.fileName, previewDocument.mimeType) ? (
+                                    <iframe
+                                        src={previewDocument.fileUrl}
+                                        title={`preview-${previewDocument.fileName}`}
+                                        className="h-[420px] w-full bg-white"
+                                    />
+                                ) : (
+                                    <div className="px-4 py-6 text-sm text-slate-500">
+                                        ไฟล์ชนิดนี้ยังไม่รองรับตัวอย่างในระบบ กรุณาเปิดจากเครื่องเพื่อตรวจสอบ
+                                    </div>
+                                )}
                             </div>
                         )}
 

@@ -10,6 +10,18 @@ export interface DashboardStats {
     cpeCreditsChange: number;
 }
 
+export interface WeeklyRevenuePoint {
+    date: string;
+    label: string;
+    amount: number;
+}
+
+export interface DashboardSystemStatusItem {
+    status: 'healthy' | 'degraded';
+    label: string;
+    detail?: string;
+}
+
 export interface RecentEnrollment {
     id: string;
     userName: string;
@@ -27,6 +39,12 @@ export interface TopCourse {
 
 export interface DashboardData {
     stats: DashboardStats;
+    weeklyRevenue: WeeklyRevenuePoint[];
     recentEnrollments: RecentEnrollment[];
     topCourses: TopCourse[];
+    systemStatus: {
+        api: DashboardSystemStatusItem;
+        database: DashboardSystemStatusItem;
+        videoProvider: DashboardSystemStatusItem;
+    };
 }

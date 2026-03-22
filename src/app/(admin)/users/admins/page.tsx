@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
-import { apiClient } from '@/services/api/client';
+import { ApiError, apiClient } from '@/services/api/client';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { parseDbDate } from '@/utils/date';
@@ -21,12 +21,14 @@ interface AdminUser {
 
 export default function AdminsPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [admins, setAdmins] = useState<AdminUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [adminToDelete, setAdminToDelete] = useState<AdminUser | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(searchParams.get('created') === '1' ? 'สร้างผู้ดูแลระบบสำเร็จ' : null);
 
     const fetchAdmins = async () => {
         try {
@@ -57,17 +59,16 @@ export default function AdminsPage() {
             setAdmins(prev => prev.filter(admin => admin.id !== adminToDelete.id));
             setAdminToDelete(null);
             setPasswordError(null);
-            alert('ลบผู้ดูแลระบบสำเร็จ');
+            setNotice('ลบผู้ดูแลระบบสำเร็จ');
         } catch (error: unknown) {
             console.error('Failed to delete admin:', error);
-            const err = error as Error;
-            const errorMessage = err.message || 'เกิดข้อผิดพลาดในการลบ';
-            if (errorMessage.includes('รหัสผ่าน')) {
-                setPasswordError(errorMessage);
+            const apiError = error instanceof ApiError ? error : null;
+            if (apiError?.code === 'INVALID_CONFIRM_PASSWORD') {
+                setPasswordError(apiError.message);
             } else {
                 setAdminToDelete(null);
                 setPasswordError(null);
-                alert(errorMessage);
+                setError(apiError?.message || 'เกิดข้อผิดพลาดในการลบ');
             }
         } finally {
             setIsDeleting(false);
@@ -96,6 +97,11 @@ export default function AdminsPage() {
 
     return (
         <div className="space-y-6 md:space-y-8 animate-fade-in">
+            {notice && (
+                <div className="px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700">
+                    {notice}
+                </div>
+            )}
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>

@@ -1,5 +1,5 @@
 import type { Pharmacist } from '../types';
-import { Eye, Mail, Award, CheckCircle } from 'lucide-react';
+import { Eye, Mail, Award, CheckCircle, XCircle } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 
 interface PharmacistsTableProps {
@@ -42,9 +42,13 @@ export function PharmacistsTable({ pharmacists, onView, onEmail }: PharmacistsTa
                                 </span>
                             </td>
                             <td className="px-6 py-4">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                                    <CheckCircle size={14} />
-                                    ยืนยันแล้ว
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                                    pharmacist.status === 'active'
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                    {pharmacist.status === 'active' ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                                    {pharmacist.status === 'active' ? 'ใช้งาน' : 'ไม่ใช้งาน'}
                                 </span>
                             </td>
                             <td className="px-6 py-4">
@@ -58,20 +62,24 @@ export function PharmacistsTable({ pharmacists, onView, onEmail }: PharmacistsTa
                             <td className="px-6 py-4 text-slate-600">{formatDate(pharmacist.joined)}</td>
                             <td className="px-6 py-4">
                                 <div className="flex items-center justify-end gap-2">
-                                    <button
-                                        onClick={() => onView?.(pharmacist.id)}
-                                        className="p-2.5 hover:bg-emerald-100 rounded-xl transition-all group/btn"
-                                        title="ดูรายละเอียด"
-                                    >
-                                        <Eye size={18} className="text-slate-500 group-hover/btn:text-emerald-600" />
-                                    </button>
-                                    <button
-                                        onClick={() => onEmail?.(pharmacist.id)}
-                                        className="p-2.5 hover:bg-blue-100 rounded-xl transition-all group/btn"
-                                        title="ส่งอีเมล"
-                                    >
-                                        <Mail size={18} className="text-slate-500 group-hover/btn:text-blue-600" />
-                                    </button>
+                                    {onView && (
+                                        <button
+                                            onClick={() => onView(pharmacist.id)}
+                                            className="p-2.5 hover:bg-emerald-100 rounded-xl transition-all group/btn"
+                                            title="ดูรายละเอียด"
+                                        >
+                                            <Eye size={18} className="text-slate-500 group-hover/btn:text-emerald-600" />
+                                        </button>
+                                    )}
+                                    {onEmail && (
+                                        <button
+                                            onClick={() => onEmail(pharmacist.id)}
+                                            className="p-2.5 hover:bg-blue-100 rounded-xl transition-all group/btn"
+                                            title="ส่งอีเมล"
+                                        >
+                                            <Mail size={18} className="text-slate-500 group-hover/btn:text-blue-600" />
+                                        </button>
+                                    )}
                                 </div>
                             </td>
                         </tr>

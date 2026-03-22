@@ -8,13 +8,15 @@ import { PharmacistsTable } from '@/features/users/components/PharmacistsTable';
 
 import { useState, useEffect } from 'react';
 
+const PAGE_SIZE = 10;
+
 export default function PharmacistsPage() {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState('');
     const [status, setStatus] = useState<'active' | 'inactive' | ''>('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
-    const { pharmacists, stats, isLoading, error } = usePharmacists(page, 20, debouncedSearch, status || undefined);
+    const { pharmacists, stats, isLoading, error } = usePharmacists(page, PAGE_SIZE, debouncedSearch, status || undefined);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -23,6 +25,15 @@ export default function PharmacistsPage() {
         }, 500);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [status]);
+
+    const totalItems = stats?.total ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    const startItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+    const endItem = totalItems === 0 ? 0 : Math.min(page * PAGE_SIZE, totalItems);
 
     // Subtle loading UI
 
@@ -76,13 +87,12 @@ export default function PharmacistsPage() {
                 <PharmacistsTable
                     pharmacists={pharmacists}
                     onView={(id) => router.push(`/users/pharmacists/${id}`)}
-                    onEmail={(id) => alert(`ส่งอีเมลถึง Pharmacist ID: ${id}`)}
                 />
 
                 {/* Pagination */}
                 <div className="p-6 border-t border-emerald-100 bg-slate-50 flex items-center justify-between">
                     <p className="text-sm text-slate-500 font-medium">
-                        แสดง 1-{pharmacists.length} จากทั้งหมด {stats?.total || pharmacists.length} รายการ
+                        แสดง {startItem}-{endItem} จากทั้งหมด {totalItems} รายการ
                     </p>
                     <div className="flex items-center gap-2">
                         <button 
@@ -95,7 +105,7 @@ export default function PharmacistsPage() {
                         <button className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold shadow-sm">{page}</button>
                         <button 
                             className="px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all"
-                            disabled={pharmacists.length < 20}
+                            disabled={page >= totalPages}
                             onClick={() => setPage(prev => prev + 1)}
                         >
                             ถัดไป

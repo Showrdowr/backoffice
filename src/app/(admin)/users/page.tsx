@@ -8,13 +8,15 @@ import { UsersTable } from '@/features/users/components/UsersTable';
 
 import { useState, useEffect } from 'react';
 
+const PAGE_SIZE = 10;
+
 export default function UsersPage() {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState('');
     const [status, setStatus] = useState<'active' | 'inactive' | ''>('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
-    const { users, stats, isLoading, error } = useUsers(page, 20, debouncedSearch, status || undefined);
+    const { users, stats, isLoading, error } = useUsers(page, PAGE_SIZE, debouncedSearch, status || undefined);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -23,6 +25,15 @@ export default function UsersPage() {
         }, 500);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [status]);
+
+    const totalItems = stats?.total ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    const startItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+    const endItem = totalItems === 0 ? 0 : Math.min(page * PAGE_SIZE, totalItems);
 
     // เราใช้การเปลี่ยน opacity ของตารางและ Spinner เล็กๆ แทนเพื่อไม่ให้ดูเหมือนการ "refresh" ทั้งหน้า
 
@@ -76,18 +87,12 @@ export default function UsersPage() {
                 <UsersTable
                     users={users}
                     onView={(id) => router.push(`/users/${id}`)}
-                    onEmail={(id) => alert(`ส่งอีเมลถึง User ID: ${id}`)}
-                    onDelete={(id) => {
-                        if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้นี้?')) {
-                            console.log('Delete user:', id);
-                        }
-                    }}
                 />
 
                 {/* Pagination */}
                 <div className="p-4 md:p-6 border-t border-sky-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <p className="text-sm text-slate-500 font-medium text-center sm:text-left">
-                        แสดง 1-{users.length} จากทั้งหมด {stats?.total || users.length} รายการ
+                        แสดง {startItem}-{endItem} จากทั้งหมด {totalItems} รายการ
                     </p>
                     <div className="flex items-center justify-center gap-2">
                         <button 
@@ -100,7 +105,7 @@ export default function UsersPage() {
                         <button className="px-3 md:px-4 py-2 bg-sky-500 text-white rounded-xl text-sm font-semibold shadow-sm min-w-[40px]">{page}</button>
                         <button 
                             className="px-3 md:px-4 py-2 border border-slate-200 rounded-xl text-sm hover:bg-white disabled:opacity-50 font-semibold transition-all touch-target"
-                            disabled={users.length < 20}
+                            disabled={page >= totalPages}
                             onClick={() => setPage(prev => prev + 1)}
                         >
                             ถัดไป

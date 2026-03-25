@@ -48,6 +48,30 @@ function normalizeLessonForPage(lesson: Lesson): FormLesson {
     };
 }
 
+function getPublishedCourseSaveError(lessonItems: FormLesson[]): string | null {
+    if (lessonItems.length === 0) {
+        return 'ต้องมีอย่างน้อย 1 บทเรียนก่อนเผยแพร่';
+    }
+
+    for (const lesson of lessonItems) {
+        const lessonTitle = lesson.title?.trim() || 'ไม่มีชื่อบทเรียน';
+        if (!lesson.videoId) {
+            return `บทเรียน "${lessonTitle}" ยังไม่มีวิดีโอ`;
+        }
+
+        const documents = Array.isArray(lesson.documents) ? lesson.documents : [];
+        if (documents.length === 0) {
+            return `บทเรียน "${lessonTitle}" ต้องมีเอกสารอย่างน้อย 1 ไฟล์`;
+        }
+
+        if (!lesson.lessonQuiz && !lesson.hasQuiz) {
+            return `บทเรียน "${lessonTitle}" ต้องมีแบบทดสอบท้ายบท`;
+        }
+    }
+
+    return null;
+}
+
 function mapExamQuestionToForm(question: {
     id: number | string;
     questionText?: string | null;
@@ -287,6 +311,12 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
 
         try {
             await persistExamSettings();
+            if (status === 'PUBLISHED') {
+                const publishedCourseSaveError = getPublishedCourseSaveError(lessons);
+                if (publishedCourseSaveError) {
+                    throw new Error(`คอร์สยังบันทึกแบบเผยแพร่ไม่ได้: ${publishedCourseSaveError}`);
+                }
+            }
             await saveCourse();
             router.push('/courses');
             router.refresh();

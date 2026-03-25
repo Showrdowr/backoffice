@@ -13,6 +13,15 @@ export enum CourseStatus {
     ARCHIVED = 'ARCHIVED',
 }
 
+export type CourseAudience = 'all' | 'general' | 'pharmacist';
+export type CourseAdminAction = 'delete' | 'archive';
+
+export interface CourseDeletionBlockers {
+    enrollmentsCount: number;
+    certificatesCount: number;
+    orderItemsCount: number;
+}
+
 // QuestionType - supports both legacy and new schema values
 export type QuestionType =
     | 'MULTIPLE_CHOICE'
@@ -63,6 +72,7 @@ export interface Course {
     authorName?: string;
     price?: number;
     language?: string;
+    audience?: CourseAudience;
     skillLevel?: 'ALL' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
     hasCertificate?: boolean;
     maxStudents?: number | null;
@@ -88,6 +98,9 @@ export interface Course {
     exam?: Exam | null;
     relatedCourses?: Course[];
     relatedCourseIds?: number[];
+    deletionBlockers?: CourseDeletionBlockers;
+    canHardDelete?: boolean;
+    recommendedAdminAction?: CourseAdminAction;
     // Frontend display fields (backward compatible)
     enrollmentsCount?: number;
     enrolledCount?: number;
@@ -257,6 +270,7 @@ export interface CreateCourseInput {
     authorName?: string;
     price?: number;
     language?: string;
+    audience?: CourseAudience;
     hasCertificate?: boolean;
     maxStudents?: number;
     enrollmentDeadline?: string;
@@ -276,6 +290,7 @@ export interface CreateLessonInput {
     courseId: number;
     videoId: number;
     title: string;
+    description?: string;
     sequenceOrder?: number;
 }
 

@@ -21,6 +21,7 @@ import { courseService } from '@/features/courses/services/courseService';
 import { examService } from '@/features/courses/services/examService';
 import type { Category } from '@/features/courses/types/categories';
 import type { Course, ExamSettings, Lesson, Question, QuestionOption, QuestionType } from '@/features/courses/types';
+import { COURSE_AUDIENCE_OPTIONS } from '@/features/courses/utils/audience';
 
 const DEFAULT_EXAM_SETTINGS: ExamSettings = {
     minPassingScore: 70,
@@ -96,6 +97,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         description, setDescription,
         details, setDetails,
         categoryId, setCategoryId,
+        audience, setAudience,
         price, setPrice,
         cpeCredits, setCpeCredits,
         conferenceCode, setConferenceCode,
@@ -428,6 +430,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                         <option value="">เลือกหมวดหมู่</option>
                                         {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">กลุ่มผู้เรียน</label>
+                                    <p className="mb-2 text-xs text-slate-500">กำหนดว่าคอร์สนี้จะแสดงให้ผู้ใช้ role ใดมองเห็นได้</p>
+                                    <select value={audience} onChange={(event) => setAudience(event.target.value as 'all' | 'general' | 'pharmacist')} className="w-full rounded-xl border border-sky-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400">
+                                        {COURSE_AUDIENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </select>
+                                    <p className="mt-2 text-xs text-slate-400">{COURSE_AUDIENCE_OPTIONS.find((option) => option.value === audience)?.description}</p>
                                 </div>
                             </div>
                         </div>

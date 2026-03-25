@@ -1,6 +1,13 @@
-import { apiClient } from '@/services/api/client';
+import { ApiError, apiClient } from '@/services/api/client';
 import type { CoursesData, CategoriesData, CourseStatus, Category, Course } from '../types';
 import type { Video } from '@/features/videos/types';
+import { normalizeCourseAudience } from '../utils/audience';
+import {
+    buildCourseDeleteConflictMessage,
+    canCourseBeHardDeleted,
+    getCourseRecommendedAdminAction,
+    normalizeCourseDeletionBlockers,
+} from '../utils/deletion';
 
 type ApiCategoryRef = {
     id?: number | string | null;
@@ -29,6 +36,40 @@ type CourseFilters = {
     search?: string;
     limit?: number;
 };
+
+function normalizeOptionalNumber(value: unknown, options?: { integer?: boolean }) {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (value === null || value === '') {
+        return null;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        return undefined;
+    }
+
+    return options?.integer ? Math.trunc(parsed) : parsed;
+}
+
+function normalizeCourseWritePayload(data: ApiRecord): ApiRecord {
+    return {
+        ...data,
+        categoryId: normalizeOptionalNumber(data.categoryId, { integer: true }),
+        subcategoryId: normalizeOptionalNumber(data.subcategoryId, { integer: true }),
+        price: normalizeOptionalNumber(data.price) ?? 0,
+        cpeCredits: normalizeOptionalNumber(data.cpeCredits) ?? 0,
+        maxStudents: normalizeOptionalNumber(data.maxStudents, { integer: true }) ?? undefined,
+        previewVideoId: normalizeOptionalNumber(data.previewVideoId, { integer: true }),
+        relatedCourseIds: Array.isArray(data.relatedCourseIds)
+            ? data.relatedCourseIds
+                .map((id) => normalizeOptionalNumber(id, { integer: true }))
+                .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
+            : data.relatedCourseIds,
+    };
+}
 
 function normalizeVideo(raw: unknown): Video | undefined {
     if (!raw || typeof raw !== 'object') {
@@ -77,6 +118,65 @@ function buildCoursesQuery(filters?: CourseFilters) {
     return query ? `/courses?${query}` : '/courses';
 }
 
+function normalizeCourseDeletionFields(raw: Partial<Course>) {
+    const deletionBlockers = normalizeCourseDeletionBlockers(raw.deletionBlockers);
+    const draftCourse = {
+        ...raw,
+        deletionBlockers,
+        canHardDelete: typeof raw.canHardDelete === 'boolean' ? raw.canHardDelete : undefined,
+        recommendedAdminAction: raw.recommendedAdminAction,
+    } as Partial<Course>;
+
+    return {
+        deletionBlockers,
+        canHardDelete: canCourseBeHardDeleted(draftCourse),
+        recommendedAdminAction: getCourseRecommendedAdminAction(draftCourse),
+    };
+}
+
+function normalizeCourseResponse(course: ApiCourseRaw): CourseResponse {
+    const categoryRef = typeof course.category === 'object' && course.category ? course.category : undefined;
+    const categoryName = categoryRef?.name || course.category;
+    const authorName =
+        (typeof course.authorName === 'string' && course.authorName.trim()) ? course.authorName :
+            (typeof course['author_name'] === 'string' && course['author_name'].trim()) ? course['author_name'] as string :
+                (typeof course.instructor === 'string' && course.instructor.trim()) ? course.instructor :
+                    '';
+
+    return {
+        ...course,
+        title: course.title || '',
+        createdAt: course.createdAt || new Date().toISOString(),
+        price: Number(course.price) || 0,
+        cpeCredits: Number(course.cpeCredits ?? 0) || 0,
+        maxStudents: course.maxStudents === null || course.maxStudents === undefined
+            ? undefined
+            : Number(course.maxStudents) || 0,
+        previewVideoId: typeof course.previewVideoId === 'number' || typeof course.previewVideoId === 'string'
+            ? Number(course.previewVideoId)
+            : undefined,
+        audience: normalizeCourseAudience(String(course.audience || 'all')),
+        status: String(course.status || 'DRAFT').toUpperCase() as CourseStatus,
+        category: categoryName || 'Uncategorized',
+        enrolledCount: Number(course.enrolledCount ?? course.enrollmentsCount ?? 0),
+        enrollmentsCount: Number(course.enrolledCount ?? course.enrollmentsCount ?? 0),
+        relatedCourseIds: Array.isArray(course.relatedCourseIds)
+            ? course.relatedCourseIds.map((id) => Number(id))
+            : Array.isArray(course.relatedCourses)
+                ? course.relatedCourses.map((related) => Number(related.id))
+                : [],
+        previewVideo: normalizeVideo(course.previewVideo),
+        lessons: Array.isArray(course.lessons)
+            ? course.lessons.map((lesson) => ({
+                ...lesson,
+                video: normalizeVideo((lesson as unknown as { video?: unknown }).video),
+            }))
+            : [],
+        authorName,
+        ...normalizeCourseDeletionFields(course),
+    } as CourseResponse;
+}
+
 export const courseService = {
     /**
      * Fetch all courses with stats
@@ -102,12 +202,18 @@ export const courseService = {
                     createdAt: c.createdAt || new Date().toISOString(),
                     categoryId: resolvedCategoryId ? Number(resolvedCategoryId) : undefined,
                     price: Number(c.price) || 0,
+                    cpeCredits: Number(c.cpeCredits ?? 0) || 0,
+                    maxStudents: c.maxStudents === null || c.maxStudents === undefined
+                        ? undefined
+                        : Number(c.maxStudents) || 0,
+                    audience: normalizeCourseAudience(String(c.audience || 'all')),
                     status: normalizedStatus,
                     category: categoryName || 'Uncategorized',
                     lessonsCount: c.lessonsCount || (Array.isArray(c.lessons) ? c.lessons.length : 0),
                     enrolledCount: Number(c.enrolledCount ?? c.enrollmentsCount ?? 0),
                     enrollmentsCount: Number(c.enrolledCount ?? c.enrollmentsCount ?? 0),
                     authorName,
+                    ...normalizeCourseDeletionFields(c),
                 } as Course;
             });
             
@@ -135,38 +241,7 @@ export const courseService = {
     async getCourse(id: number | string): Promise<CourseResponse> {
         try {
             const response = await apiClient.get<ApiCourseRaw>(`/courses/${id}`);
-            const course = response.data;
-            const categoryRef = typeof course.category === 'object' && course.category ? course.category : undefined;
-            const categoryName = categoryRef?.name || course.category;
-            const authorName =
-                (typeof course.authorName === 'string' && course.authorName.trim()) ? course.authorName :
-                    (typeof course['author_name'] === 'string' && course['author_name'].trim()) ? course['author_name'] as string :
-                        (typeof course.instructor === 'string' && course.instructor.trim()) ? course.instructor :
-                            '';
-
-            return {
-                ...course,
-                title: course.title || '',
-                createdAt: course.createdAt || new Date().toISOString(),
-                price: Number(course.price) || 0,
-                status: String(course.status || 'DRAFT').toUpperCase() as CourseStatus,
-                category: categoryName || 'Uncategorized',
-                enrolledCount: Number(course.enrolledCount ?? course.enrollmentsCount ?? 0),
-                enrollmentsCount: Number(course.enrolledCount ?? course.enrollmentsCount ?? 0),
-                relatedCourseIds: Array.isArray(course.relatedCourseIds)
-                    ? course.relatedCourseIds.map((id) => Number(id))
-                    : Array.isArray(course.relatedCourses)
-                        ? course.relatedCourses.map((related) => Number(related.id))
-                        : [],
-                previewVideo: normalizeVideo(course.previewVideo),
-                lessons: Array.isArray(course.lessons)
-                    ? course.lessons.map((lesson) => ({
-                        ...lesson,
-                        video: normalizeVideo((lesson as unknown as { video?: unknown }).video),
-                    }))
-                    : [],
-                authorName,
-            } as CourseResponse;
+            return normalizeCourseResponse(response.data);
         } catch (error) {
             console.error('Failed to fetch course details:', error);
             throw error;
@@ -209,6 +284,33 @@ export const courseService = {
             await apiClient.delete(`/courses/${id}`);
         } catch (error) {
             console.error('Failed to delete course:', error);
+            if (error instanceof ApiError && error.code === 'COURSE_DELETE_CONFLICT') {
+                const details = error.details && typeof error.details === 'object'
+                    ? error.details as Record<string, unknown>
+                    : {};
+                const normalizedBlockers = normalizeCourseDeletionBlockers(details);
+
+                throw new ApiError(buildCourseDeleteConflictMessage(normalizedBlockers), {
+                    statusCode: error.statusCode,
+                    code: error.code,
+                    details: {
+                        ...details,
+                        deletionBlockers: normalizedBlockers,
+                        canHardDelete: false,
+                        recommendedAdminAction: 'archive',
+                    },
+                });
+            }
+            throw error;
+        }
+    },
+
+    async archiveCourse(id: number): Promise<CourseResponse> {
+        try {
+            const response = await apiClient.put<ApiCourseRaw>(`/courses/${id}`, { status: 'ARCHIVED' });
+            return normalizeCourseResponse(response.data);
+        } catch (error) {
+            console.error('Failed to archive course:', error);
             throw error;
         }
     },
@@ -218,7 +320,7 @@ export const courseService = {
      */
     async createCourse(data: ApiRecord): Promise<CourseResponse> {
         try {
-            const response = await apiClient.post<CourseResponse>('/courses', data);
+            const response = await apiClient.post<CourseResponse>('/courses', normalizeCourseWritePayload(data));
             return response.data;
         } catch (error) {
             console.error('Failed to create course:', error);
@@ -231,7 +333,7 @@ export const courseService = {
      */
     async updateCourse(id: number | string, data: ApiRecord): Promise<CourseResponse> {
         try {
-            const response = await apiClient.put<CourseResponse>(`/courses/${id}`, data);
+            const response = await apiClient.put<CourseResponse>(`/courses/${id}`, normalizeCourseWritePayload(data));
             return response.data;
         } catch (error) {
             console.error('Failed to update course:', error);

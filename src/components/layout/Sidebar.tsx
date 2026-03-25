@@ -63,6 +63,7 @@ const menuItems: MenuItem[] = [
         adminOnly: true,
         children: [
             { name: 'คำสั่งซื้อ', href: '/payments/orders' },
+            { name: 'คำขอคืนเงิน', href: '/payments/refund-requests' },
             { name: 'รายการธุรกรรม', href: '/payments/transactions' },
             { name: 'คูปองส่วนลด', href: '/payments/coupons' },
         ],

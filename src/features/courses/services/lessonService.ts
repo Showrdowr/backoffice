@@ -38,6 +38,7 @@ export const lessonService = {
     try {
       const response = await apiClient.post<Lesson>(`/courses/${data.courseId}/lessons`, {
         title: data.title,
+        description: data.description,
         videoId: data.videoId,
         sequenceOrder: data.sequenceOrder || 1,
       });

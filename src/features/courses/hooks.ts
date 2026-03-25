@@ -43,7 +43,20 @@ export function useCourses() {
             await courseService.deleteCourse(id);
             await refresh();
         } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to delete course'));
+            try {
+                await refresh();
+            } catch {
+                // Keep the original action error as the primary failure surfaced to the UI.
+            }
+            throw err;
+        }
+    };
+
+    const archiveCourse = async (id: number) => {
+        try {
+            await courseService.archiveCourse(id);
+            await refresh();
+        } catch (err) {
             throw err;
         }
     };
@@ -55,6 +68,7 @@ export function useCourses() {
         error,
         refresh,
         deleteCourse,
+        archiveCourse,
     };
 }
 

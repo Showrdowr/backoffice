@@ -1,4 +1,4 @@
-import { Edit, Trash2, Users, BookOpen, Calendar, Award, Film } from 'lucide-react';
+import { Archive, Edit, Trash2, Users, BookOpen, Calendar, Award, Film } from 'lucide-react';
 import Link from 'next/link';
 import type { Course } from '../../types';
 
@@ -10,7 +10,11 @@ interface CourseHeroProps {
         maxStudents: number | null;
         courseEndAt?: string | Date | null;
     };
-    onDelete: () => void;
+    onRemove: () => void;
+    removeLabel: string;
+    removeVariant: 'delete' | 'archive';
+    removeDisabled?: boolean;
+    removeHint?: string | null;
 }
 
 function normalizeStatus(status: string) {
@@ -44,8 +48,17 @@ function formatDate(value?: string | Date | null) {
     return parsed.toLocaleDateString('th-TH');
 }
 
-export function CourseHero({ course, stats, onDelete }: CourseHeroProps) {
+export function CourseHero({
+    course,
+    stats,
+    onRemove,
+    removeLabel,
+    removeVariant,
+    removeDisabled = false,
+    removeHint,
+}: CourseHeroProps) {
     const thumbnail = course.thumbnail || course.thumbnailUrl;
+    const isArchiveAction = removeVariant === 'archive';
 
     return (
         <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-xl">
@@ -94,14 +107,24 @@ export function CourseHero({ course, stats, onDelete }: CourseHeroProps) {
                                 แก้ไขคอร์ส
                             </Link>
                             <button
-                                onClick={onDelete}
-                                className="flex items-center gap-2 rounded-xl border border-red-400/30 bg-red-500/20 px-5 py-2.5 font-semibold text-white transition-all hover:bg-red-500/30"
+                                onClick={onRemove}
+                                disabled={removeDisabled}
+                                className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                                    isArchiveAction
+                                        ? 'border border-amber-300/40 bg-amber-500/20 hover:bg-amber-500/30'
+                                        : 'border border-red-400/30 bg-red-500/20 hover:bg-red-500/30'
+                                }`}
                             >
-                                <Trash2 size={18} />
-                                ลบ
+                                {isArchiveAction ? <Archive size={18} /> : <Trash2 size={18} />}
+                                {removeLabel}
                             </button>
                         </div>
                     </div>
+                    {removeHint && (
+                        <div className="mb-4 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white/90 backdrop-blur-sm">
+                            {removeHint}
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                         <div className="rounded-xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">

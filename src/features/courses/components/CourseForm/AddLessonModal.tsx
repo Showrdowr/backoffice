@@ -4,8 +4,7 @@ import type { Video as VideoType } from '@/features/videos/types';
 import type { LessonDocument } from '../../types';
 import type { VideoQuestion } from '../../types';
 import { VideoPickerPanel } from './VideoPickerPanel';
-
-const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+import { MAX_LESSON_DOCUMENT_BYTES, MAX_LESSON_DOCUMENT_MB } from '../../constants';
 
 interface LessonData {
     title: string;
@@ -87,8 +86,8 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
         if (files) {
             const nextDocuments: LessonDocument[] = [];
             for (const [idx, file] of Array.from(files).entries()) {
-                if (file.size > MAX_DOCUMENT_BYTES) {
-                    setModalError('ไฟล์เอกสารต้องไม่เกิน 5MB ต่อไฟล์');
+                if (file.size > MAX_LESSON_DOCUMENT_BYTES) {
+                    setModalError(`ไฟล์เอกสารต้องไม่เกิน ${MAX_LESSON_DOCUMENT_MB}MB ต่อไฟล์`);
                     continue;
                 }
 
@@ -294,7 +293,9 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                 <Upload size={20} className="text-emerald-500" />
                             </div>
                             <p className="mb-1 text-sm font-semibold text-slate-700">อัปโหลดเอกสารประกอบ</p>
-                            <p className="mb-3 text-xs text-slate-500">รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด 5MB ต่อไฟล์) และดูตัวอย่างในระบบได้เฉพาะ PDF</p>
+                            <p className="mb-3 text-xs text-slate-500">
+                                รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด {MAX_LESSON_DOCUMENT_MB}MB ต่อไฟล์) และดูตัวอย่างในระบบได้เฉพาะ PDF
+                            </p>
                             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-600">
                                 <Upload size={16} />
                                 เลือกไฟล์

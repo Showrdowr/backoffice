@@ -14,12 +14,14 @@ function getStatusBadge(status: OrderStatus) {
         PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
         PAID: 'bg-green-100 text-green-700 border-green-200',
         CANCELLED: 'bg-red-100 text-red-700 border-red-200',
+        REFUNDED: 'bg-sky-100 text-sky-700 border-sky-200',
     };
 
     const labels = {
         PENDING: 'รอชำระ',
         PAID: 'ชำระแล้ว',
         CANCELLED: 'ยกเลิก',
+        REFUNDED: 'คืนเงิน',
     };
 
     return (

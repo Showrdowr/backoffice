@@ -9,12 +9,16 @@ import { CoursesTable } from '@/features/courses/components/CoursesTable';
 import { LoadingSpinner, ErrorMessage } from '@/components/ui';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
+import {
+    getCourseArchiveSummary,
+    getCourseDeletionSummary,
+} from '@/features/courses/utils/deletion';
 
 const PAGE_SIZE = 10;
 
 export default function CoursesPage() {
     const router = useRouter();
-    const { courses, stats, isLoading, error, deleteCourse } = useCourses();
+    const { courses, stats, isLoading, error, deleteCourse, archiveCourse } = useCourses();
     const { categories } = useCategories();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -95,6 +99,47 @@ export default function CoursesPage() {
     const startItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
     const endItem = totalItems === 0 ? 0 : Math.min(page * PAGE_SIZE, totalItems);
 
+    const findCourseById = (id: string | number) =>
+        courses.find((course) => String(course.id) === String(id));
+
+    const handleDeleteCourse = async (id: string | number) => {
+        const course = findCourseById(id);
+        const confirmMessage = course
+            ? `คุณแน่ใจหรือไม่ว่าต้องการลบคอร์ส "${course.title}" แบบถาวร?\n\n${getCourseDeletionSummary(course)}`
+            : 'คุณแน่ใจหรือไม่ว่าต้องการลบคอร์สนี้แบบถาวร?';
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            await deleteCourse(Number(id));
+            alert('ลบคอร์สสำเร็จ');
+        } catch (err) {
+            console.error('Failed to delete course:', err);
+            alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบคอร์ส');
+        }
+    };
+
+    const handleArchiveCourse = async (id: string | number) => {
+        const course = findCourseById(id);
+        const confirmMessage = course
+            ? `คอร์ส "${course.title}" ไม่ควรถูกลบถาวร\n\n${getCourseArchiveSummary(course)}\n\nคุณต้องการเปลี่ยนสถานะเป็น ARCHIVED ใช่หรือไม่?`
+            : 'คุณต้องการเปลี่ยนสถานะคอร์สเป็น ARCHIVED ใช่หรือไม่?';
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            await archiveCourse(Number(id));
+            alert('ย้ายคอร์สไปเก็บถาวรสำเร็จ');
+        } catch (err) {
+            console.error('Failed to archive course:', err);
+            alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเก็บถาวรคอร์ส');
+        }
+    };
+
     if (isLoading) {
         return <LoadingSpinner message="กำลังโหลดข้อมูลคอร์ส..." />;
     }
@@ -143,17 +188,8 @@ export default function CoursesPage() {
                     courses={paginatedCourses}
                     onView={(id) => router.push(`/courses/${id}`)}
                     onEdit={(id) => router.push(`/courses/${id}/edit`)}
-                    onDelete={async (id) => {
-                        if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบคอร์สนี้?')) {
-                            try {
-                                await deleteCourse(id as number);
-                                alert('ลบคอร์สสำเร็จ');
-                            } catch (err) {
-                                console.error('Failed to delete course:', err);
-                                alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลบคอร์ส');
-                            }
-                        }
-                    }}
+                    onDelete={handleDeleteCourse}
+                    onArchive={handleArchiveCourse}
                 />
 
                 {/* Pagination */}

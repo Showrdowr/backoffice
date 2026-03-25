@@ -1,15 +1,22 @@
 import type { Course } from '../types';
-import { Eye, Edit, Trash2, Star, Users } from 'lucide-react';
+import { Archive, Eye, Edit, Trash2, Star, Users } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/format';
+import { getCourseAudienceBadgeClass, getCourseAudienceLabel } from '../utils/audience';
+import {
+    canCourseBeHardDeleted,
+    getCourseArchiveSummary,
+    getCourseDeletionSummary,
+} from '../utils/deletion';
 
 interface CoursesTableProps {
     courses: Course[];
     onView?: (id: string | number) => void;
     onEdit?: (id: string | number) => void;
     onDelete?: (id: string | number) => void;
+    onArchive?: (id: string | number) => void;
 }
 
-export function CoursesTable({ courses, onView, onEdit, onDelete }: CoursesTableProps) {
+export function CoursesTable({ courses, onView, onEdit, onDelete, onArchive }: CoursesTableProps) {
     const getStatusUI = (status: Course['status']) => {
         const normalized = String(status || 'DRAFT').toUpperCase();
 
@@ -52,15 +59,28 @@ export function CoursesTable({ courses, onView, onEdit, onDelete }: CoursesTable
                             const statusUI = getStatusUI(course.status);
                             const parsedPrice = Number(course.price ?? 0);
                             const priceLabel = parsedPrice <= 0 ? 'ฟรี' : formatCurrency(parsedPrice);
+                            const canHardDelete = canCourseBeHardDeleted(course);
+                            const isArchived = String(course.status || 'DRAFT').toUpperCase() === 'ARCHIVED';
+                            const removalSummary = canHardDelete ? null : getCourseArchiveSummary(course);
 
                             return (
                                 <tr key={course.id} className="hover:bg-violet-50/30 transition-colors group">
                                     <td className="px-6 py-4">
                                         <div>
-                                            <p className="font-semibold text-slate-800">{course.title}</p>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-semibold text-slate-800">{course.title}</p>
+                                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${getCourseAudienceBadgeClass(course.audience)}`}>
+                                                    {getCourseAudienceLabel(course.audience)}
+                                                </span>
+                                            </div>
                                             <p className="text-sm text-slate-500">
                                                 {typeof course.category === 'object' ? course.category?.name : course.category} • {course.cpeCredits ?? 0} CPE Credits • ผู้สอน: {course.authorName || '-'}
                                             </p>
+                                            {!canHardDelete && (
+                                                <p className="mt-1 text-xs font-medium text-amber-700">
+                                                    {getCourseDeletionSummary(course)}
+                                                </p>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
@@ -101,13 +121,24 @@ export function CoursesTable({ courses, onView, onEdit, onDelete }: CoursesTable
                                             >
                                                 <Edit size={18} className="text-slate-500 group-hover/btn:text-blue-600" />
                                             </button>
-                                            <button
-                                                onClick={() => onDelete?.(course.id)}
-                                                className="p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn"
-                                                title="ลบ"
-                                            >
-                                                <Trash2 size={18} className="text-slate-500 group-hover/btn:text-red-600" />
-                                            </button>
+                                            {canHardDelete ? (
+                                                <button
+                                                    onClick={() => onDelete?.(course.id)}
+                                                    className="p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn"
+                                                    title="ลบคอร์สถาวร"
+                                                >
+                                                    <Trash2 size={18} className="text-slate-500 group-hover/btn:text-red-600" />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => !isArchived && onArchive?.(course.id)}
+                                                    disabled={isArchived}
+                                                    className="p-2.5 hover:bg-amber-100 rounded-xl transition-all group/btn disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                                                    title={isArchived ? 'คอร์สนี้ถูกเก็บถาวรแล้ว' : removalSummary || 'เก็บคอร์สไว้ในคลังแทนการลบ'}
+                                                >
+                                                    <Archive size={18} className="text-slate-500 group-hover/btn:text-amber-600" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

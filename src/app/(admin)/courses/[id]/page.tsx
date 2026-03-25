@@ -9,6 +9,13 @@ import type { Course, Lesson } from '@/features/courses/types';
 import { CourseHero } from '@/features/courses/components/CourseDetail/CourseHero';
 import { CourseLessonsTab } from '@/features/courses/components/CourseDetail/CourseLessonsTab';
 import { CourseAssessmentsTab } from '@/features/courses/components/CourseDetail/CourseAssessmentsTab';
+import { getCourseAudienceLabel } from '@/features/courses/utils/audience';
+import {
+    canCourseBeHardDeleted,
+    getCourseArchiveSummary,
+    getCourseDeletionBlockerItems,
+    getCourseDeletionSummary,
+} from '@/features/courses/utils/deletion';
 
 type CourseTab = 'overview' | 'lessons' | 'assessments';
 
@@ -74,14 +81,31 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     const lessonDocumentCount = lessons.reduce((sum, lesson) => sum + (lesson.documents?.length || 0), 0);
     const lessonQuizCount = lessons.filter((lesson) => lesson.hasQuiz || lesson.lessonQuiz).length;
     const interactiveQuestionCount = lessons.reduce((sum, lesson) => sum + (lesson.videoQuestions?.length || 0), 0);
+    const canHardDelete = canCourseBeHardDeleted(course);
+    const isArchived = String(course?.status || 'DRAFT').toUpperCase() === 'ARCHIVED';
+    const blockerItems = getCourseDeletionBlockerItems(course).filter((item) => item.count > 0);
+    const removalHint = canHardDelete ? null : getCourseArchiveSummary(course);
 
-    const handleDelete = async () => {
+    const handleRemove = async () => {
         setShowDeleteModal(false);
         try {
-            await courseService.deleteCourse(Number(id));
-            router.push('/courses');
+            if (canHardDelete) {
+                await courseService.deleteCourse(Number(id));
+                router.push('/courses');
+                return;
+            }
+
+            const updatedCourse = await courseService.archiveCourse(Number(id));
+            setCourse(updatedCourse);
+            setPageError(null);
         } catch (error) {
-            setPageError(error instanceof Error ? error.message : 'ลบคอร์สไม่สำเร็จ');
+            try {
+                const refreshedCourse = await courseService.getCourse(id);
+                setCourse(refreshedCourse);
+            } catch {
+                // Preserve the original action error if refresh fails.
+            }
+            setPageError(error instanceof Error ? error.message : 'จัดการคอร์สไม่สำเร็จ');
         }
     };
 
@@ -134,8 +158,24 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                     maxStudents: course.maxStudents ?? null,
                     courseEndAt: course.courseEndAt,
                 }}
-                onDelete={() => setShowDeleteModal(true)}
+                onRemove={() => !isArchived && setShowDeleteModal(true)}
+                removeLabel={canHardDelete ? 'ลบคอร์ส' : isArchived ? 'เก็บถาวรแล้ว' : 'เก็บถาวร'}
+                removeVariant={canHardDelete ? 'delete' : 'archive'}
+                removeDisabled={isArchived}
+                removeHint={isArchived ? 'คอร์สนี้ถูกเก็บถาวรแล้ว จึงไม่สามารถลบถาวรได้' : removalHint}
             />
+
+            {!canHardDelete && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+                    <p className="font-semibold">คอร์สนี้ลบถาวรไม่ได้</p>
+                    <p className="mt-1">{getCourseDeletionSummary(course)}</p>
+                    {blockerItems.length > 0 && (
+                        <p className="mt-2 text-amber-800">
+                            {blockerItems.map((item) => `${item.label} ${item.count}`).join(' • ')}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="flex border-b border-slate-200">
                 {tabs.map((tab) => (
@@ -204,6 +244,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                 <div className="flex items-center justify-between border-b border-slate-100 py-2">
                                     <span className="text-slate-500">หมวดหลัก</span>
                                     <span className="font-medium text-slate-800">{getCategoryName(course)}</span>
+                                </div>
+                                <div className="flex items-center justify-between border-b border-slate-100 py-2">
+                                    <span className="text-slate-500">กลุ่มผู้เรียน</span>
+                                    <span className="font-medium text-slate-800">{getCourseAudienceLabel(course.audience)}</span>
                                 </div>
                                 <div className="flex items-center justify-between border-b border-slate-100 py-2">
                                     <span className="text-slate-500">หมวดหมู่ย่อย</span>
@@ -298,15 +342,30 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <div className="mx-4 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
                         <div className="border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 p-6">
-                            <h3 className="text-xl font-bold text-slate-800">ยืนยันการลบคอร์ส</h3>
+                            <h3 className="text-xl font-bold text-slate-800">
+                                {canHardDelete ? 'ยืนยันการลบคอร์ส' : 'ยืนยันการเก็บถาวรคอร์ส'}
+                            </h3>
                         </div>
                         <div className="p-6">
                             <p className="mb-4 text-slate-600">
-                                คุณต้องการลบคอร์ส "<span className="font-semibold">{course.title}</span>" ใช่หรือไม่?
+                                {canHardDelete
+                                    ? <>คุณต้องการลบคอร์ส "<span className="font-semibold">{course.title}</span>" ใช่หรือไม่?</>
+                                    : <>คอร์ส "<span className="font-semibold">{course.title}</span>" มีประวัติใช้งานแล้ว คุณต้องการย้ายไปเก็บถาวรแทนการลบใช่หรือไม่?</>}
                             </p>
-                            <p className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-                                การดำเนินการนี้ไม่สามารถย้อนกลับได้
-                            </p>
+                            {canHardDelete ? (
+                                <p className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                                    การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                                </p>
+                            ) : (
+                                <div className="mb-6 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+                                    <p>{getCourseArchiveSummary(course)}</p>
+                                    {blockerItems.length > 0 && (
+                                        <p className="mt-2">
+                                            {blockerItems.map((item) => `${item.label} ${item.count}`).join(' • ')}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setShowDeleteModal(false)}
@@ -315,10 +374,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                                     ยกเลิก
                                 </button>
                                 <button
-                                    onClick={handleDelete}
-                                    className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700"
+                                    onClick={handleRemove}
+                                    className={`flex-1 rounded-xl px-4 py-3 font-semibold text-white ${
+                                        canHardDelete
+                                            ? 'bg-red-600 hover:bg-red-700'
+                                            : 'bg-amber-600 hover:bg-amber-700'
+                                    }`}
                                 >
-                                    ลบคอร์ส
+                                    {canHardDelete ? 'ลบคอร์ส' : 'เก็บถาวร'}
                                 </button>
                             </div>
                         </div>

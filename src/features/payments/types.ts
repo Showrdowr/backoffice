@@ -13,12 +13,19 @@ export enum OrderStatus {
     PENDING = 'PENDING',
     PAID = 'PAID',
     CANCELLED = 'CANCELLED',
+    REFUNDED = 'REFUNDED',
 }
 
 export enum TransactionStatus {
     PENDING = 'PENDING',
     SUCCESS = 'SUCCESS',
     FAIL = 'FAIL',
+}
+
+export enum RefundRequestStatus {
+    PENDING = 'PENDING',
+    APPROVED = 'APPROVED',
+    REJECTED = 'REJECTED',
 }
 
 // ==========================================
@@ -172,6 +179,27 @@ export interface VouchersData {
 export interface OrdersData {
     orders: OrderDisplay[];
     stats: OrderStats;
+}
+
+export interface RefundRequest {
+    id: number;
+    status: RefundRequestStatus;
+    reason?: string | null;
+    adminNote?: string | null;
+    requestedAt?: string | null;
+    resolvedAt?: string | null;
+    resolvedByAdminId?: string | null;
+    enrollmentId: number;
+    courseId: number;
+    courseTitle: string;
+    coursePrice: number;
+    orderItemId?: number | null;
+    orderId?: number | null;
+    user: {
+        id: number;
+        fullName: string;
+        email: string;
+    };
 }
 
 export interface TransactionsData {

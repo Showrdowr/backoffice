@@ -6,6 +6,7 @@ import type { Question, QuestionType, ExamType, QuestionOption, ExamSettings, Vi
 import type { Video as VideoType } from '@/features/videos/types';
 import { courseService } from '../services/courseService';
 import { lessonService } from '../services/lessonService';
+import { normalizeCourseAudience } from '../utils/audience';
 
 const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const MAX_THUMBNAIL_DIMENSION = 1920;
@@ -114,6 +115,7 @@ type DraftSnapshot = {
     description: string;
     details: string;
     categoryId: string;
+    audience: 'all' | 'general' | 'pharmacist';
     status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
     courseType: string;
     price: number;
@@ -137,6 +139,7 @@ function createEmptyDraftSnapshot(): DraftSnapshot {
         description: '',
         details: '',
         categoryId: '',
+        audience: 'all',
         status: 'DRAFT',
         courseType: 'paid',
         price: 0,
@@ -191,6 +194,7 @@ function normalizeDraftSnapshot(value: unknown): DraftSnapshot {
         description: typeof candidate.description === 'string' ? candidate.description : fallback.description,
         details: typeof candidate.details === 'string' ? candidate.details : fallback.details,
         categoryId: typeof candidate.categoryId === 'string' ? candidate.categoryId : fallback.categoryId,
+        audience: normalizeCourseAudience(typeof candidate.audience === 'string' ? candidate.audience : fallback.audience),
         status: candidate.status === 'PUBLISHED' || candidate.status === 'ARCHIVED' ? candidate.status : 'DRAFT',
         courseType: typeof candidate.courseType === 'string' ? candidate.courseType : fallback.courseType,
         price: typeof candidate.price === 'number' ? candidate.price : fallback.price,
@@ -484,6 +488,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
     const [description, setDescription] = useState('');
     const [details, setDetails] = useState(''); // รายละเอียดคอร์ส
     const [categoryId, setCategoryId] = useState<string>('');
+    const [audience, setAudience] = useState<'all' | 'general' | 'pharmacist'>('all');
     const [status, setStatus] = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT');
     const [price, setPrice] = useState<number>(0);
     const [cpeCredits, setCpeCredits] = useState<number>(0);
@@ -529,6 +534,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
         description,
         details,
         categoryId,
+        audience,
         status,
         courseType,
         price,
@@ -546,6 +552,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
         uploadedVideos,
     }), [
         authorName,
+        audience,
         categoryId,
         ceEnabled,
         conferenceCode,
@@ -590,11 +597,12 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
                 setDescription(data.description || '');
                 setDetails(data.details || '');
                 setCategoryId(data.categoryId?.toString() || '');
+                setAudience(normalizeCourseAudience(typeof data.audience === 'string' ? data.audience : 'all'));
                 setCourseType(data.price && Number(data.price) > 0 ? 'paid' : 'free');
                 setPrice(Number(data.price) || 0);
-                setCpeCredits(data.cpeCredits ?? 0);
+                setCpeCredits(Number(data.cpeCredits ?? 0) || 0);
                 setConferenceCode(data.conferenceCode || '');
-                setCeEnabled((data.cpeCredits ?? 0) > 0 || Boolean(data.conferenceCode));
+                setCeEnabled((Number(data.cpeCredits ?? 0) || 0) > 0 || Boolean(data.conferenceCode));
                 setLanguage(data.language || 'Thai');
                 setHasCertificate(Boolean(data.hasCertificate));
                 setMaxStudents(Number(data.maxStudents) || 0);
@@ -664,6 +672,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
             setDescription(snapshot.description);
             setDetails(snapshot.details);
             setCategoryId(snapshot.categoryId);
+            setAudience(snapshot.audience);
             setStatus(snapshot.status);
             setCourseType(snapshot.courseType);
             setPrice(snapshot.price);
@@ -721,6 +730,17 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
     }, [enableDraftPersistence, hasUnsavedChanges]);
+
+    useEffect(() => {
+        if (previewVideoId === null) {
+            return;
+        }
+
+        const previewStillAvailable = uploadedVideos.some((video) => Number(video.id) === Number(previewVideoId));
+        if (!previewStillAvailable) {
+            setPreviewVideoId(null);
+        }
+    }, [previewVideoId, uploadedVideos]);
 
     const handleThumbnailSelect = async (file: File) => {
         setThumbnailError('');
@@ -784,23 +804,32 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
 
     const buildPayload = (statusOverride?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') => {
         const parsedCategoryId = parseInt(categoryId, 10);
+        const resolvedPreviewVideoId = previewVideoId !== null
+            && uploadedVideos.some((video) => Number(video.id) === Number(previewVideoId))
+            ? previewVideoId
+            : null;
+        const resolvedPrice = Number(price || 0);
+        const resolvedCpeCredits = Number(cpeCredits || 0);
+        const resolvedMaxStudents = Number(maxStudents || 0);
+
         return {
             title,
             description,
             details,
             categoryId: Number.isNaN(parsedCategoryId) ? undefined : parsedCategoryId,
-            price: courseType === 'free' ? 0 : price,
-            cpeCredits: ceEnabled ? cpeCredits : 0,
+            audience,
+            price: courseType === 'free' ? 0 : (Number.isFinite(resolvedPrice) ? resolvedPrice : 0),
+            cpeCredits: ceEnabled ? (Number.isFinite(resolvedCpeCredits) ? resolvedCpeCredits : 0) : 0,
             conferenceCode: ceEnabled ? conferenceCode || undefined : undefined,
             language: language.trim() || undefined,
             hasCertificate,
-            maxStudents: maxStudents > 0 ? maxStudents : undefined,
+            maxStudents: resolvedMaxStudents > 0 ? resolvedMaxStudents : undefined,
             enrollmentDeadline: enrollmentDeadline ? `${enrollmentDeadline}T00:00:00.000Z` : undefined,
             courseEndAt: courseEndAt ? `${courseEndAt}T00:00:00.000Z` : undefined,
             authorName: authorName || undefined,
             thumbnail: thumbnail || undefined,
             thumbnailMimeType: thumbnailMimeType || undefined,
-            previewVideoId,
+            previewVideoId: resolvedPreviewVideoId,
             relatedCourseIds,
             status: statusOverride || status,
         };
@@ -825,6 +854,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
         description, setDescription,
         details, setDetails,
         categoryId, setCategoryId,
+        audience, setAudience,
         price, setPrice,
         cpeCredits, setCpeCredits,
         conferenceCode, setConferenceCode,

@@ -25,6 +25,7 @@ import type { Category } from '@/features/courses/types/categories';
 import type { Course } from '@/features/courses/types';
 import { CourseVideoSection } from '@/features/courses/components/CourseForm/CourseVideoSection';
 import { ApiError } from '@/services/api/client';
+import { COURSE_AUDIENCE_OPTIONS, getCourseAudienceLabel } from '@/features/courses/utils/audience';
 
 type StepId = 1 | 2 | 3 | 4;
 
@@ -71,7 +72,12 @@ function getFriendlyErrorMessage(error: unknown, fallback: string) {
     if (error instanceof ApiError) {
         switch (error.code) {
             case 'CATEGORY_NOT_FOUND':
+            case 'COURSE_CATEGORY_NOT_FOUND':
                 return 'ไม่พบหมวดหมู่ที่เลือก กรุณารีเฟรชหน้าแล้วลองใหม่';
+            case 'COURSE_SUBCATEGORY_NOT_FOUND':
+                return 'ไม่พบหมวดหมู่ย่อยที่เลือก กรุณาเลือกใหม่อีกครั้ง';
+            case 'COURSE_SUBCATEGORY_MISMATCH':
+                return 'หมวดหมู่ย่อยไม่ตรงกับหมวดหมู่หลักที่เลือก กรุณาตรวจสอบอีกครั้ง';
             case 'VIDEO_IN_USE':
                 return 'วิดีโอนี้กำลังถูกใช้งานอยู่ จึงยังไม่สามารถลบได้';
             default:
@@ -139,6 +145,7 @@ export default function AddCoursePage() {
         description, setDescription,
         details, setDetails,
         categoryId, setCategoryId,
+        audience, setAudience,
         courseType, setCourseType,
         price, setPrice,
         cpeCredits, setCpeCredits,
@@ -420,6 +427,14 @@ export default function AddCoursePage() {
                                         </select>
                                         {categoriesError && <button type="button" onClick={() => void loadCategories()} className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-red-600"><RefreshCw size={14} />{categoriesError}</button>}
                                     </div>
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">กลุ่มผู้เรียน</label>
+                                        <FieldHelp>กำหนดว่าคอร์สนี้จะแสดงให้ผู้ใช้กลุ่มใดมองเห็นได้ในหน้าเว็บ</FieldHelp>
+                                        <select value={audience} onChange={(event) => setAudience(event.target.value as 'all' | 'general' | 'pharmacist')} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400">
+                                            {COURSE_AUDIENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                        </select>
+                                        <p className="mt-2 text-xs text-slate-400">{COURSE_AUDIENCE_OPTIONS.find((option) => option.value === audience)?.description}</p>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div>
@@ -667,6 +682,7 @@ export default function AddCoursePage() {
                                 <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
                                     <ReviewStat label="ผู้สอน" value={authorName || '-'} />
                                     <ReviewStat label="หมวดหมู่" value={selectedCategory?.name || '-'} />
+                                    <ReviewStat label="กลุ่มผู้เรียน" value={getCourseAudienceLabel(audience)} />
                                     <ReviewStat label="ราคา" value={courseType === 'free' ? 'ฟรี' : `฿${Number(price || 0).toLocaleString()}`} />
                                     <ReviewStat label="CPE Credit" value={ceEnabled ? `${cpeCredits || 0} หน่วย` : 'ไม่เปิดใช้'} />
                                     <ReviewStat label="วิดีโอตัวอย่าง" value={selectedPreviewVideo?.name || 'ยังไม่ได้เลือก'} />

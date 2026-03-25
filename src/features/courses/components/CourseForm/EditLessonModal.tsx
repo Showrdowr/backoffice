@@ -3,8 +3,7 @@ import { X, FileText, Trash2, Upload, AlertCircle, Eye } from 'lucide-react';
 import type { Lesson, LessonDocument } from '../../types';
 import type { Video as VideoType } from '@/features/videos/types';
 import { VideoPickerPanel } from './VideoPickerPanel';
-
-const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+import { MAX_LESSON_DOCUMENT_BYTES, MAX_LESSON_DOCUMENT_MB } from '../../constants';
 
 interface EditLessonModalProps {
   isOpen: boolean;
@@ -65,8 +64,8 @@ export function EditLessonModal({ isOpen, onClose, onSave, lesson, onChange, ava
     const files = event.target.files;
     if (files) {
       Promise.all(Array.from(files).map(async (file, idx) => {
-        if (file.size > MAX_DOCUMENT_BYTES) {
-          throw new Error('ไฟล์เอกสารต้องไม่เกิน 5MB ต่อไฟล์');
+        if (file.size > MAX_LESSON_DOCUMENT_BYTES) {
+          throw new Error(`ไฟล์เอกสารต้องไม่เกิน ${MAX_LESSON_DOCUMENT_MB}MB ต่อไฟล์`);
         }
 
         return {
@@ -270,7 +269,9 @@ export function EditLessonModal({ isOpen, onClose, onSave, lesson, onChange, ava
                   <Upload size={20} className="text-emerald-500" />
                 </div>
                 <p className="mb-1 text-sm font-semibold text-slate-700">อัปโหลดเอกสารประกอบ</p>
-                <p className="mb-3 text-xs text-slate-500">รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด 5MB ต่อไฟล์)</p>
+                <p className="mb-3 text-xs text-slate-500">
+                  รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด {MAX_LESSON_DOCUMENT_MB}MB ต่อไฟล์)
+                </p>
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-600">
                   <Upload size={16} />
                   เลือกไฟล์

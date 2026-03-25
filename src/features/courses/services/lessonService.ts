@@ -85,6 +85,16 @@ export const lessonService = {
     }
   },
 
+  async getLessonDocument(id: number): Promise<LessonDocument> {
+    try {
+      const response = await apiClient.get<LessonDocument>(`/lesson-documents/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to fetch lesson document:", error);
+      throw error;
+    }
+  },
+
   async deleteLessonDocument(id: number): Promise<void> {
     try {
       await apiClient.delete(`/lesson-documents/${id}`);

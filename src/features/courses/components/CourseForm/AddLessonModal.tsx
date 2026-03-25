@@ -37,6 +37,11 @@ function isPdfDocument(fileName: string, mimeType?: string | null) {
     return String(mimeType || '').toLowerCase().includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
 }
 
+function getFirstPreviewableDocumentId(documents: LessonDocument[]) {
+    const firstPreviewableDocument = documents.find((doc) => isPdfDocument(doc.fileName, doc.mimeType));
+    return firstPreviewableDocument ? String(firstPreviewableDocument.id) : null;
+}
+
 export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, availableVideos, onVideoUpload }: AddLessonModalProps) {
     const [modalError, setModalError] = useState<string | null>(null);
     const [isVideoPickerBusy, setIsVideoPickerBusy] = useState(false);
@@ -53,7 +58,7 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
         }
 
         if (!previewDocumentId || !lessonData.documents.some((doc) => String(doc.id) === previewDocumentId)) {
-            setPreviewDocumentId(String(lessonData.documents[0].id));
+            setPreviewDocumentId(getFirstPreviewableDocumentId(lessonData.documents));
         }
     }, [lessonData.documents, previewDocumentId]);
 
@@ -102,7 +107,7 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                 documents: [...lessonData.documents, ...nextDocuments],
             });
             if (nextDocuments.length > 0) {
-                setPreviewDocumentId(String(nextDocuments[0].id));
+                setPreviewDocumentId(getFirstPreviewableDocumentId([...lessonData.documents, ...nextDocuments]));
             }
         }
         event.target.value = '';
@@ -115,8 +120,17 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
             documents: remainingDocuments,
         });
         if (previewDocumentId === id) {
-            setPreviewDocumentId(remainingDocuments[0] ? String(remainingDocuments[0].id) : null);
+            setPreviewDocumentId(getFirstPreviewableDocumentId(remainingDocuments));
         }
+    };
+
+    const openPreviewDocument = (document: LessonDocument) => {
+        setPreviewDocumentId(String(document.id));
+        if (!isPdfDocument(document.fileName, document.mimeType)) {
+            setModalError('ตัวอย่างในระบบรองรับเฉพาะไฟล์ PDF ส่วน DOC/DOCX/PPT/PPTX/XLS/XLSX ให้เปิดจากเครื่องเพื่อตรวจสอบ');
+            return;
+        }
+        setModalError(null);
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -227,9 +241,9 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                             <p className="text-xs text-slate-500">{doc.mimeType} • {formatFileSize(doc.sizeBytes)}</p>
                                         </div>
                                         <button
-                                            onClick={() => setPreviewDocumentId(String(doc.id))}
+                                            onClick={() => openPreviewDocument(doc)}
                                             className="rounded-lg p-2 transition-all hover:bg-sky-50"
-                                            title="ดูตัวอย่างเอกสาร"
+                                            title="ดูตัวอย่างเอกสาร (PDF)"
                                             disabled={isVideoPickerBusy}
                                         >
                                             <Eye size={16} className="text-sky-500" />
@@ -269,7 +283,7 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                     />
                                 ) : (
                                     <div className="px-4 py-6 text-sm text-slate-500">
-                                        ไฟล์ชนิดนี้ยังไม่รองรับตัวอย่างในระบบ กรุณาเปิดจากเครื่องเพื่อตรวจสอบ
+                                        ตัวอย่างในระบบรองรับเฉพาะไฟล์ PDF ส่วน DOC/DOCX/PPT/PPTX/XLS/XLSX ให้เปิดจากเครื่องเพื่อตรวจสอบ
                                     </div>
                                 )}
                             </div>
@@ -280,7 +294,7 @@ export function AddLessonModal({ isOpen, onClose, onAdd, lessonData, onChange, a
                                 <Upload size={20} className="text-emerald-500" />
                             </div>
                             <p className="mb-1 text-sm font-semibold text-slate-700">อัปโหลดเอกสารประกอบ</p>
-                            <p className="mb-3 text-xs text-slate-500">รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด 5MB ต่อไฟล์)</p>
+                            <p className="mb-3 text-xs text-slate-500">รองรับ PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (สูงสุด 5MB ต่อไฟล์) และดูตัวอย่างในระบบได้เฉพาะ PDF</p>
                             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-600">
                                 <Upload size={16} />
                                 เลือกไฟล์

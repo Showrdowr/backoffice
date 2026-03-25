@@ -329,20 +329,33 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
                 sequenceOrder: lessons.length + 1,
             });
 
+            const createdDocumentsByTempId = new Map<string, LessonDocument>();
             if (lessonData.documents.length > 0) {
                 for (const document of lessonData.documents) {
-                    await lessonService.addLessonDocument({
+                    if (!document.fileUrl) {
+                        throw new Error('ไม่พบข้อมูลไฟล์เอกสาร กรุณาอัปโหลดใหม่อีกครั้ง');
+                    }
+                    const createdDocument = await lessonService.addLessonDocument({
                         lessonId: Number(createdLesson.id),
                         fileName: document.fileName,
                         mimeType: document.mimeType,
                         sizeBytes: document.sizeBytes,
                         fileUrl: document.fileUrl,
                     });
+                    createdDocumentsByTempId.set(String(document.id), createdDocument);
                 }
             }
 
-            const refreshed = await lessonService.getLessons(Number(courseId));
-            setLessons(refreshed.lessons.map((lesson) => normalizeLessonForForm(lesson)));
+            const nextLesson = normalizeLessonForForm({
+                ...createdLesson,
+                duration: lessonData.duration,
+                description: lessonData.description,
+                documents: lessonData.documents.map((document) => (
+                    createdDocumentsByTempId.get(String(document.id)) ?? document
+                )),
+            });
+
+            setLessons((prev) => [...prev, nextLesson]);
             setNewLesson({ title: '', videoId: null, duration: '', description: '', videoQuestions: [], documents: [] });
             setShowAddModal(false);
         } catch (error) {
@@ -362,7 +375,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
             }
 
             try {
-                await lessonService.updateLesson(Number(currentLesson.id), {
+                const updatedLesson = await lessonService.updateLesson(Number(currentLesson.id), {
                     title: currentLesson.title,
                     videoId: currentLesson.videoId ? Number(currentLesson.videoId) : undefined,
                 });
@@ -380,20 +393,35 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
                     }
                 }
 
+                const createdDocumentsByTempId = new Map<string, LessonDocument>();
                 for (const document of nextDocuments) {
                     if (!originalDocIds.has(String(document.id)) || String(document.id).startsWith('doc-')) {
-                        await lessonService.addLessonDocument({
+                        if (!document.fileUrl) {
+                            throw new Error('ไม่พบข้อมูลไฟล์เอกสาร กรุณาอัปโหลดใหม่อีกครั้ง');
+                        }
+                        const createdDocument = await lessonService.addLessonDocument({
                             lessonId: Number(currentLesson.id),
                             fileName: document.fileName,
                             mimeType: document.mimeType,
                             sizeBytes: document.sizeBytes,
                             fileUrl: document.fileUrl,
                         });
+                        createdDocumentsByTempId.set(String(document.id), createdDocument);
                     }
                 }
 
-                const refreshed = await lessonService.getLessons(Number(courseId));
-                setLessons(refreshed.lessons.map((lesson) => normalizeLessonForForm(lesson)));
+                const mergedLesson = normalizeLessonForForm({
+                    ...updatedLesson,
+                    duration: currentLesson.duration,
+                    description: currentLesson.description,
+                    documents: nextDocuments.map((document) => (
+                        createdDocumentsByTempId.get(String(document.id)) ?? document
+                    )),
+                });
+
+                setLessons((prev) => prev.map((lesson) => (
+                    String(lesson.id) === String(currentLesson.id) ? mergedLesson : lesson
+                )));
                 setShowEditModal(false);
                 setCurrentLesson(null);
             } catch (error) {

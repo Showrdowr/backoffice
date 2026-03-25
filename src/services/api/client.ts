@@ -78,6 +78,14 @@ class ApiClient {
             return data;
         } catch (error) {
             clearTimeout(timeoutId);
+            if (error instanceof Error && error.name === 'AbortError') {
+                const timeoutError = new ApiError('คำขอใช้เวลานานเกินกำหนด กรุณาลองใหม่อีกครั้ง', {
+                    statusCode: 408,
+                    code: 'REQUEST_TIMEOUT',
+                });
+                console.error('API request timed out:', timeoutError);
+                throw timeoutError;
+            }
             console.error('API request failed:', error);
             throw error;
         }

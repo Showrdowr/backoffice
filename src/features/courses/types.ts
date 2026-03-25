@@ -131,7 +131,7 @@ export interface LessonDocument {
     fileName: string;
     mimeType: string;
     sizeBytes: number;
-    fileUrl: string;
+    fileUrl?: string;
     createdAt?: string;
 }
 

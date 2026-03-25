@@ -5,6 +5,7 @@ import { usePharmacists } from '@/features/users/hooks';
 import { UserStatsCards } from '@/features/users/components/UserStatsCards';
 import { UserTableToolbar } from '@/features/users/components/UserTableToolbar';
 import { PharmacistsTable } from '@/features/users/components/PharmacistsTable';
+import { userService } from '@/features/users/services/userService';
 
 import { useState, useEffect } from 'react';
 
@@ -16,7 +17,10 @@ export default function PharmacistsPage() {
     const [status, setStatus] = useState<'active' | 'inactive' | ''>('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
-    const { pharmacists, stats, isLoading, error } = usePharmacists(page, PAGE_SIZE, debouncedSearch, status || undefined);
+    const [actionError, setActionError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [deletingPharmacistId, setDeletingPharmacistId] = useState<string | null>(null);
+    const { pharmacists, stats, isLoading, error, refresh } = usePharmacists(page, PAGE_SIZE, debouncedSearch, status || undefined);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -29,6 +33,31 @@ export default function PharmacistsPage() {
     useEffect(() => {
         setPage(1);
     }, [status]);
+
+    const handleDeletePharmacist = async (userId: string) => {
+        const selectedPharmacist = pharmacists.find((pharmacist) => pharmacist.id === userId);
+        if (!selectedPharmacist) {
+            return;
+        }
+
+        const shouldDelete = window.confirm(`ยืนยันการลบเภสัชกร "${selectedPharmacist.name}" ใช่หรือไม่?`);
+        if (!shouldDelete) {
+            return;
+        }
+
+        try {
+            setDeletingPharmacistId(userId);
+            setActionError('');
+            setNotice('');
+            await userService.deleteUser(userId);
+            await refresh();
+            setNotice(`ลบเภสัชกร "${selectedPharmacist.name}" สำเร็จ`);
+        } catch (deleteError) {
+            setActionError(deleteError instanceof Error ? deleteError.message : 'ลบเภสัชกรไม่สำเร็จ');
+        } finally {
+            setDeletingPharmacistId(null);
+        }
+    };
 
     const totalItems = stats?.total ?? 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -59,6 +88,16 @@ export default function PharmacistsPage() {
 
     return (
         <div className="space-y-8 animate-fade-in">
+            {notice && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                    {notice}
+                </div>
+            )}
+            {actionError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {actionError}
+                </div>
+            )}
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -87,6 +126,8 @@ export default function PharmacistsPage() {
                 <PharmacistsTable
                     pharmacists={pharmacists}
                     onView={(id) => router.push(`/users/pharmacists/${id}`)}
+                    onDelete={handleDeletePharmacist}
+                    deletingPharmacistId={deletingPharmacistId}
                 />
 
                 {/* Pagination */}

@@ -5,6 +5,7 @@ import { useUsers } from '@/features/users/hooks';
 import { UserStatsCards } from '@/features/users/components/UserStatsCards';
 import { UserTableToolbar } from '@/features/users/components/UserTableToolbar';
 import { UsersTable } from '@/features/users/components/UsersTable';
+import { userService } from '@/features/users/services/userService';
 
 import { useState, useEffect } from 'react';
 
@@ -16,7 +17,10 @@ export default function UsersPage() {
     const [status, setStatus] = useState<'active' | 'inactive' | ''>('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
-    const { users, stats, isLoading, error } = useUsers(page, PAGE_SIZE, debouncedSearch, status || undefined);
+    const [actionError, setActionError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+    const { users, stats, isLoading, error, refresh } = useUsers(page, PAGE_SIZE, debouncedSearch, status || undefined);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -29,6 +33,31 @@ export default function UsersPage() {
     useEffect(() => {
         setPage(1);
     }, [status]);
+
+    const handleDeleteUser = async (userId: string) => {
+        const selectedUser = users.find((user) => user.id === userId);
+        if (!selectedUser) {
+            return;
+        }
+
+        const shouldDelete = window.confirm(`ยืนยันการลบผู้ใช้ "${selectedUser.name}" ใช่หรือไม่?`);
+        if (!shouldDelete) {
+            return;
+        }
+
+        try {
+            setDeletingUserId(userId);
+            setActionError('');
+            setNotice('');
+            await userService.deleteUser(userId);
+            await refresh();
+            setNotice(`ลบผู้ใช้ "${selectedUser.name}" สำเร็จ`);
+        } catch (deleteError) {
+            setActionError(deleteError instanceof Error ? deleteError.message : 'ลบผู้ใช้ไม่สำเร็จ');
+        } finally {
+            setDeletingUserId(null);
+        }
+    };
 
     const totalItems = stats?.total ?? 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -59,6 +88,16 @@ export default function UsersPage() {
 
     return (
         <div className="space-y-6 md:space-y-8 animate-fade-in">
+            {notice && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                    {notice}
+                </div>
+            )}
+            {actionError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {actionError}
+                </div>
+            )}
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -87,6 +126,8 @@ export default function UsersPage() {
                 <UsersTable
                     users={users}
                     onView={(id) => router.push(`/users/${id}`)}
+                    onDelete={handleDeleteUser}
+                    deletingUserId={deletingUserId}
                 />
 
                 {/* Pagination */}

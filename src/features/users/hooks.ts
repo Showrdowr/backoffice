@@ -33,7 +33,7 @@ export function useUsers(page: number = 1, limit: number = 20, search?: string, 
         setLoading(true);
         setError(null);
         try {
-            const data = await userService.getUsers(page, limit);
+            const data = await userService.getUsers(page, limit, search, status);
             setUsers(data.users);
             setStats(data.stats);
         } catch (err) {
@@ -82,7 +82,7 @@ export function usePharmacists(page: number = 1, limit: number = 20, search?: st
         setLoading(true);
         setError(null);
         try {
-            const data = await userService.getPharmacists(page, limit);
+            const data = await userService.getPharmacists(page, limit, search, status);
             setPharmacists(data.pharmacists);
             setStats(data.stats);
         } catch (err) {

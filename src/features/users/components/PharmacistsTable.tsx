@@ -1,14 +1,16 @@
 import type { Pharmacist } from '../types';
-import { Eye, Mail, Award, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, Mail, Award, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 
 interface PharmacistsTableProps {
     pharmacists: Pharmacist[];
     onView?: (id: string) => void;
     onEmail?: (id: string) => void;
+    onDelete?: (id: string) => void;
+    deletingPharmacistId?: string | null;
 }
 
-export function PharmacistsTable({ pharmacists, onView, onEmail }: PharmacistsTableProps) {
+export function PharmacistsTable({ pharmacists, onView, onEmail, onDelete, deletingPharmacistId }: PharmacistsTableProps) {
     return (
         <div className="overflow-x-auto">
             <table className="w-full">
@@ -78,6 +80,21 @@ export function PharmacistsTable({ pharmacists, onView, onEmail }: PharmacistsTa
                                             title="ส่งอีเมล"
                                         >
                                             <Mail size={18} className="text-slate-500 group-hover/btn:text-blue-600" />
+                                        </button>
+                                    )}
+                                    {onDelete && (
+                                        <button
+                                            onClick={() => onDelete(pharmacist.id)}
+                                            disabled={deletingPharmacistId === pharmacist.id}
+                                            className="p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn disabled:cursor-not-allowed disabled:opacity-60"
+                                            title="à¸¥à¸š"
+                                        >
+                                            <Trash2
+                                                size={18}
+                                                className={deletingPharmacistId === pharmacist.id
+                                                    ? 'text-red-400'
+                                                    : 'text-slate-500 group-hover/btn:text-red-600'}
+                                            />
                                         </button>
                                     )}
                                 </div>

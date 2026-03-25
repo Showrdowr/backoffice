@@ -7,9 +7,10 @@ interface UsersTableProps {
     onView?: (id: string) => void;
     onEmail?: (id: string) => void;
     onDelete?: (id: string) => void;
+    deletingUserId?: string | null;
 }
 
-export function UsersTable({ users, onView, onEmail, onDelete }: UsersTableProps) {
+export function UsersTable({ users, onView, onEmail, onDelete, deletingUserId }: UsersTableProps) {
     return (
         <div className="overflow-x-auto">
             <table className="w-full">
@@ -70,10 +71,16 @@ export function UsersTable({ users, onView, onEmail, onDelete }: UsersTableProps
                                     {onDelete && (
                                         <button
                                             onClick={() => onDelete(user.id)}
-                                            className="p-2 md:p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn touch-target hidden md:block"
+                                            disabled={deletingUserId === user.id}
+                                            className="p-2 md:p-2.5 hover:bg-red-100 rounded-xl transition-all group/btn touch-target hidden md:block disabled:cursor-not-allowed disabled:opacity-60"
                                             title="ลบ"
                                         >
-                                            <Trash2 size={16} className="text-slate-500 group-hover/btn:text-red-600" />
+                                            <Trash2
+                                                size={16}
+                                                className={deletingUserId === user.id
+                                                    ? 'text-red-400'
+                                                    : 'text-slate-500 group-hover/btn:text-red-600'}
+                                            />
                                         </button>
                                     )}
                                 </div>

@@ -62,7 +62,7 @@ export function AddQuestionModal({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [questionType, setQuestionType] = useState<QuestionType>('multiple-choice');
     const [questionText, setQuestionText] = useState('');
-    const [points, setPoints] = useState(1);
+    const [points, setPoints] = useState('1');
     const [options, setOptions] = useState<QuestionOption[]>(DEFAULT_OPTIONS);
     const [freeTextAnswer, setFreeTextAnswer] = useState('');
 
@@ -73,7 +73,7 @@ export function AddQuestionModal({
 
         setQuestionType(normalizeQuestionType(initialQuestion?.type));
         setQuestionText(initialQuestion?.question || '');
-        setPoints(initialQuestion?.points || 1);
+        setPoints(String(initialQuestion?.points || 1));
         setOptions(buildDefaultOptions(initialQuestion));
         setFreeTextAnswer(initialQuestion?.correctAnswer || '');
     }, [initialQuestion, isOpen]);
@@ -83,6 +83,7 @@ export function AddQuestionModal({
     const handleSubmit = async () => {
         if (!questionText.trim()) return;
         if (questionType === 'multiple-choice' && options.filter((option) => option.text.trim()).length < 2) return;
+        const resolvedPoints = Number(points);
 
         const questionData: {
             type: QuestionType;
@@ -95,7 +96,7 @@ export function AddQuestionModal({
             type: questionType,
             examType,
             question: questionText,
-            points,
+            points: Number.isInteger(resolvedPoints) && resolvedPoints > 0 ? resolvedPoints : 1,
         };
 
         if (questionType === 'multiple-choice') {
@@ -121,7 +122,7 @@ export function AddQuestionModal({
     const handleClose = () => {
         setQuestionType('multiple-choice');
         setQuestionText('');
-        setPoints(1);
+        setPoints('1');
         setOptions(DEFAULT_OPTIONS);
         setFreeTextAnswer('');
         onClose();
@@ -265,8 +266,10 @@ export function AddQuestionModal({
                         <input
                             type="number"
                             value={points}
-                            onChange={(event) => setPoints(Number(event.target.value) || 1)}
+                            onChange={(event) => setPoints(event.target.value)}
                             min={1}
+                            step={1}
+                            inputMode="numeric"
                             className="w-full px-4 py-3 border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
                         />
                     </div>

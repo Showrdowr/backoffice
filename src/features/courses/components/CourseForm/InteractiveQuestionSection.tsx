@@ -20,6 +20,7 @@ type QuestionFormState = {
     displayTimeInput: string;
     sortOrder: number;
     options: QuestionOption[];
+    correctAnswer: string;
 };
 
 const DEFAULT_OPTIONS: QuestionOption[] = [
@@ -118,6 +119,24 @@ function normalizeOptionsForQuestion(question: VideoQuestion): QuestionOption[] 
     return DEFAULT_OPTIONS;
 }
 
+function normalizeTrueFalseAnswer(value?: string | null) {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    if (!normalizedValue) {
+        return '';
+    }
+
+    const matchedOption = TRUE_FALSE_OPTIONS.find((option) =>
+        option.id === normalizedValue || option.text.trim().toLowerCase() === normalizedValue
+    );
+
+    return matchedOption?.id || '';
+}
+
+function getTrueFalseAnswerLabel(value?: string | null) {
+    const normalizedValue = normalizeTrueFalseAnswer(value);
+    return TRUE_FALSE_OPTIONS.find((option) => option.id === normalizedValue)?.text || null;
+}
+
 function sortQuestions(questions: VideoQuestion[]) {
     return [...questions].sort((left, right) => {
         const displayAtDelta = Number(left.displayAtSeconds || 0) - Number(right.displayAtSeconds || 0);
@@ -170,6 +189,7 @@ export function InteractiveQuestionSection({
         displayTimeInput: '0:00',
         sortOrder: 0,
         options: DEFAULT_OPTIONS,
+        correctAnswer: '',
     });
 
     const lessonId = Number(lesson.id);
@@ -202,6 +222,7 @@ export function InteractiveQuestionSection({
             displayTimeInput: '0:00',
             sortOrder: Math.max(0, nextSortOrder),
             options: DEFAULT_OPTIONS,
+            correctAnswer: '',
         });
     };
 
@@ -256,6 +277,11 @@ export function InteractiveQuestionSection({
         }
 
         if (questionType === 'TRUE_FALSE') {
+            const correctAnswer = normalizeTrueFalseAnswer(questionForm.correctAnswer);
+            if (!correctAnswer) {
+                throw new Error('กรุณาเลือกคำตอบที่ถูกต้องสำหรับคำถามจริง/เท็จ');
+            }
+
             return {
                 lessonId,
                 questionText,
@@ -263,6 +289,7 @@ export function InteractiveQuestionSection({
                 displayAtSeconds,
                 sortOrder: Math.max(0, questionForm.sortOrder),
                 options: TRUE_FALSE_OPTIONS,
+                correctAnswer,
             };
         }
 
@@ -381,6 +408,7 @@ export function InteractiveQuestionSection({
             displayTimeInput: formatDuration(Number(question.displayAtSeconds || 0)),
             sortOrder: Number(question.sortOrder || 0),
             options: normalizeOptionsForQuestion(question),
+            correctAnswer: questionType === 'TRUE_FALSE' ? normalizeTrueFalseAnswer(question.correctAnswer) : '',
         });
         setActionError(null);
         setIsFormOpen(true);
@@ -428,6 +456,9 @@ export function InteractiveQuestionSection({
                 : nextType === 'TRUE_FALSE'
                     ? TRUE_FALSE_OPTIONS
                     : [],
+            correctAnswer: nextType === 'TRUE_FALSE'
+                ? normalizeTrueFalseAnswer(current.correctAnswer)
+                : '',
         }));
     };
 
@@ -465,6 +496,7 @@ export function InteractiveQuestionSection({
     const isSubmitDisabled =
         isSubmitting ||
         !questionForm.questionText.trim() ||
+        (questionForm.questionType === 'TRUE_FALSE' && !normalizeTrueFalseAnswer(questionForm.correctAnswer)) ||
         (questionForm.questionType === 'MULTIPLE_CHOICE' &&
             questionForm.options.filter((option) => option.text.trim()).length < 2);
 
@@ -663,8 +695,33 @@ export function InteractiveQuestionSection({
                         )}
 
                         {questionForm.questionType === 'TRUE_FALSE' && (
-                            <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                                ระบบจะสร้างตัวเลือก “จริง” และ “เท็จ” ให้อัตโนมัติ
+                            <div className="space-y-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-4">
+                                <p className="text-sm text-amber-800">
+                                    ระบบจะสร้างตัวเลือก “จริง” และ “เท็จ” ให้อัตโนมัติ และสามารถกำหนดคำตอบที่ถูกต้องได้ด้านล่าง
+                                </p>
+                                <div>
+                                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                        คำตอบที่ถูกต้อง <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="space-y-2">
+                                        {TRUE_FALSE_OPTIONS.map((option) => (
+                                            <label key={option.id} className="flex items-center gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                                <input
+                                                    type="radio"
+                                                    name="interactive-true-false-answer"
+                                                    value={option.id}
+                                                    checked={normalizeTrueFalseAnswer(questionForm.correctAnswer) === option.id}
+                                                    onChange={(event) => setQuestionForm((current) => ({
+                                                        ...current,
+                                                        correctAnswer: event.target.value,
+                                                    }))}
+                                                    className="h-4 w-4 text-orange-600 focus:ring-orange-500"
+                                                />
+                                                <span>{option.text}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -750,6 +807,14 @@ export function InteractiveQuestionSection({
                                                             {String.fromCharCode(65 + optionIndex)}. {option.text}
                                                         </span>
                                                     ))}
+                                                </div>
+                                            )}
+
+                                            {normalizedType === 'TRUE_FALSE' && getTrueFalseAnswerLabel(question.correctAnswer) && (
+                                                <div className="mt-3">
+                                                    <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800">
+                                                        เฉลย: {getTrueFalseAnswerLabel(question.correctAnswer)}
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>

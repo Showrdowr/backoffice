@@ -58,7 +58,7 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
     const [maxAttempts, setMaxAttempts] = useState('unlimited');
     const [questionText, setQuestionText] = useState('');
     const [questionType, setQuestionType] = useState<'multiple-choice' | 'free-text'>('multiple-choice');
-    const [scoreWeight, setScoreWeight] = useState(1);
+    const [scoreWeight, setScoreWeight] = useState('1');
     const [options, setOptions] = useState<QuestionOption[]>(INITIAL_OPTIONS);
     const [correctAnswer, setCorrectAnswer] = useState('');
 
@@ -77,7 +77,7 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
         setIsQuestionFormOpen(false);
         setQuestionText('');
         setQuestionType('multiple-choice');
-        setScoreWeight(1);
+        setScoreWeight('1');
         setOptions(INITIAL_OPTIONS);
         setCorrectAnswer('');
         setErrorMessage('');
@@ -119,7 +119,7 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
         setEditingQuestionId(null);
         setQuestionText('');
         setQuestionType('multiple-choice');
-        setScoreWeight(1);
+        setScoreWeight('1');
         setOptions(INITIAL_OPTIONS);
         setCorrectAnswer('');
         setIsQuestionFormOpen(false);
@@ -147,7 +147,7 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
         setEditingQuestionId(Number(question.id));
         setQuestionText(question.questionText || '');
         setQuestionType(normalizeQuestionType(question.questionType));
-        setScoreWeight(question.scoreWeight || 1);
+        setScoreWeight(String(question.scoreWeight || 1));
         setOptions(buildEditableOptions(question));
         setCorrectAnswer(question.correctAnswer || '');
         setIsQuestionFormOpen(true);
@@ -182,6 +182,10 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
 
         try {
             const ensuredQuiz = await ensureLessonQuiz();
+            const resolvedScoreWeight = Number(scoreWeight);
+            if (!Number.isInteger(resolvedScoreWeight) || resolvedScoreWeight <= 0) {
+                throw new Error('กรุณาระบุคะแนนเป็นจำนวนเต็มมากกว่า 0');
+            }
             const resolvedCorrectAnswer =
                 questionType === 'multiple-choice'
                     ? options.find((option) => option.isCorrect)?.text || ''
@@ -196,7 +200,7 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
                     ? options.filter((option) => option.text.trim())
                     : undefined,
                 correctAnswer: resolvedCorrectAnswer || undefined,
-                scoreWeight,
+                scoreWeight: resolvedScoreWeight,
             };
 
             if (editingQuestionId) {
@@ -370,8 +374,10 @@ export function LessonQuizSection({ lesson, onLessonChange }: LessonQuizSectionP
                                     <input
                                         type="number"
                                         min={1}
+                                        step={1}
+                                        inputMode="numeric"
                                         value={scoreWeight}
-                                        onChange={(event) => setScoreWeight(Number(event.target.value) || 1)}
+                                        onChange={(event) => setScoreWeight(event.target.value)}
                                         className="w-full rounded-xl border border-slate-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>

@@ -32,11 +32,36 @@ function getFirstPreviewableDocumentId(documents: LessonDocument[]) {
   return firstPreviewableDocument ? String(firstPreviewableDocument.id) : null;
 }
 
+function createDocumentPreviewUrl(fileUrl: string, mimeType?: string | null) {
+  if (!fileUrl.startsWith('data:')) {
+    return fileUrl;
+  }
+
+  try {
+    const [metadata, encodedContent = ''] = fileUrl.split(',', 2);
+    const mimeMatch = metadata.match(/^data:([^;]+)/i);
+    const resolvedMimeType = mimeMatch?.[1] || mimeType || 'application/octet-stream';
+    const byteString = metadata.includes(';base64')
+      ? atob(encodedContent)
+      : decodeURIComponent(encodedContent);
+    const bytes = new Uint8Array(byteString.length);
+
+    for (let index = 0; index < byteString.length; index += 1) {
+      bytes[index] = byteString.charCodeAt(index);
+    }
+
+    return URL.createObjectURL(new Blob([bytes], { type: resolvedMimeType }));
+  } catch {
+    return fileUrl;
+  }
+}
+
 export function EditLessonModal({ isOpen, onClose, onSave, lesson, onChange, availableVideos, onVideoUpload }: EditLessonModalProps) {
   const [modalError, setModalError] = useState<string | null>(null);
   const [isVideoPickerBusy, setIsVideoPickerBusy] = useState(false);
   const [previewDocumentId, setPreviewDocumentId] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewDocumentSrc, setPreviewDocumentSrc] = useState<string | null>(null);
   const lessonDocuments = lesson?.documents || [];
 
   const previewDocument = useMemo(
@@ -54,6 +79,22 @@ export function EditLessonModal({ isOpen, onClose, onSave, lesson, onChange, ava
       setPreviewDocumentId(getFirstPreviewableDocumentId(lessonDocuments));
     }
   }, [lessonDocuments, previewDocumentId]);
+
+  useEffect(() => {
+    if (!previewDocument?.fileUrl || !isPdfDocument(previewDocument.fileName, previewDocument.mimeType)) {
+      setPreviewDocumentSrc(null);
+      return;
+    }
+
+    const nextPreviewSrc = createDocumentPreviewUrl(previewDocument.fileUrl, previewDocument.mimeType);
+    setPreviewDocumentSrc(nextPreviewSrc);
+
+    return () => {
+      if (nextPreviewSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(nextPreviewSrc);
+      }
+    };
+  }, [previewDocument]);
 
   if (!isOpen || !lesson) return null;
 
@@ -301,11 +342,17 @@ export function EditLessonModal({ isOpen, onClose, onSave, lesson, onChange, ava
                       กำลังโหลดตัวอย่างเอกสาร...
                     </div>
                   ) : previewDocument.fileUrl && isPdfDocument(previewDocument.fileName, previewDocument.mimeType) ? (
-                    <iframe
-                      src={previewDocument.fileUrl}
-                      title={`preview-${previewDocument.fileName}`}
-                      className="h-[420px] w-full bg-white"
-                    />
+                    previewDocumentSrc ? (
+                      <iframe
+                        src={previewDocumentSrc}
+                        title={`preview-${previewDocument.fileName}`}
+                        className="h-[420px] w-full bg-white"
+                      />
+                    ) : (
+                      <div className="px-4 py-6 text-sm text-slate-500">
+                        กำลังเตรียมตัวอย่างเอกสาร...
+                      </div>
+                    )
                   ) : previewDocument.fileUrl ? (
                     <div className="px-4 py-6 text-sm text-slate-500">
                       ตัวอย่างในระบบรองรับเฉพาะไฟล์ PDF ส่วน DOC/DOCX/PPT/PPTX/XLS/XLSX ให้เปิดจากเครื่องเพื่อตรวจสอบ

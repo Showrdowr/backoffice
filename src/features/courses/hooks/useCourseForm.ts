@@ -284,7 +284,13 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
             setActionError('ไม่สามารถลบวิดีโอนี้ได้ เนื่องจากกำลังถูกใช้งานในบทเรียน');
             return;
         }
+        const isCurrentPreviewVideo = previewVideoId === videoId;
         try {
+            if (isCurrentPreviewVideo && Number.isFinite(Number(courseId))) {
+                await apiClient.put(`/courses/${courseId}`, { previewVideoId: null });
+                setPreviewVideoId(null);
+            }
+
             if (Number.isFinite(Number(videoId))) {
                 await apiClient.delete(`/videos/${videoId}`);
             }
@@ -294,7 +300,7 @@ export function useCourseForm(courseId?: string, options?: UseCourseFormOptions)
             setActionError(error instanceof Error ? error.message : 'ลบวิดีโอไม่สำเร็จ');
             return;
         }
-        if (previewVideoId === videoId) {
+        if (isCurrentPreviewVideo) {
             setPreviewVideoId(null);
         }
     };
